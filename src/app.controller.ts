@@ -15,13 +15,13 @@ export class AppController {
 
   @Get()
   @Header('Content-Type', 'text/html')
-  getHello(): string {
-    return this.appService.getHello();
+  async getHome(): Promise<string> {
+    return await this.appService.getHome();
   }
 
   @Post('receive-payload')
-  receivePayload(@Body() payload: PayloadDto) {
+  async receivePayload(@Body() payload: PayloadDto) {
     console.log('Received payload:', payload);
-    return this.appService.processPayload(payload);
+    return await this.appService.processPayload(payload);
   }
 }
