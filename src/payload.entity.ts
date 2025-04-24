@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
 
 @Entity()
 export class Payload {
@@ -13,6 +13,10 @@ export class Payload {
 
   @Column({ nullable: true })
   timestamp: number;
+
+  @Column({ nullable: true })
+  @Index({ unique: true })
+  patientID: string;
 
   @CreateDateColumn()
   createdAt: Date;

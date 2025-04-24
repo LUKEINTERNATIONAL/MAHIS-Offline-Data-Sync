@@ -1,11 +1,17 @@
-// main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.useGlobalPipes(new ValidationPipe());
+
+  /* increase JSON limit to 25 MB */
+  app.use(bodyParser.json({ limit: '25mb' }));
+  
+  // Enable CORS - allow any origin
+  app.enableCors();
   
   // Listen on all network interfaces
   const port_number = process.env.PORT || 3009;

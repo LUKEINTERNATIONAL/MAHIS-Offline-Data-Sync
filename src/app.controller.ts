@@ -7,6 +7,7 @@ export class PayloadDto {
   readonly message: string;
   readonly data?: any;
   readonly timestamp?: number;
+  readonly patientID?: string;
 }
 
 @Controller()
@@ -21,7 +22,7 @@ export class AppController {
 
   @Post('receive-payload')
   async receivePayload(@Body() payload: PayloadDto) {
-    console.log('Received payload:', payload);
+    // console.log('Received payload:', payload);
     return await this.appService.processPayload(payload);
   }
 }
