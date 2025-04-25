@@ -495,7 +495,7 @@ interface PatientData {
 export function sophisticatedMergePatientData(existingData: PatientData, incomingData: PatientData): PatientData {
     // Ensure we're working with the same patient
     if (existingData.patientID !== incomingData.patientID) {
-      throw new Error('Cannot merge data for different patients');
+      throw new Error(`Cannot merge data for different patients: patientID ${incomingData.patientID}`);
     }
   
     // Create a deep clone of the existing data as our starting point

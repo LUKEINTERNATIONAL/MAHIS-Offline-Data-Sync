@@ -49,7 +49,44 @@ export class AppService {
 
       if (existingPayload) {
         // Update existing record
-        existingPayload.data = sophisticatedMergePatientData(existingPayload.data as any, payload.data as any) as any;
+        let patient_record = payload.data
+
+        let existingData;
+        try {
+          existingData = existingPayload.data ? JSON.parse(existingPayload.data) : {};
+        } catch (e) {
+          existingData = {};
+        }
+
+        if (existingData && Object.keys(existingData).length === 0) {
+          console.log("Object is empty");
+        } else if (existingData && Object.keys(existingData).length > 0) {
+          patient_record = sophisticatedMergePatientData( JSON.parse(existingPayload.data) as any, JSON.parse(payload.data) as any) as any;
+        }
+
+        try {
+          // Parse the incoming payload data
+          const newData = JSON.parse(payload.data);
+          
+          // Parse existing data or use empty object if parsing fails
+          let existingData = {};
+          try {
+            existingData = existingPayload.data ? JSON.parse(existingPayload.data) : {};
+          } catch (e) {
+            console.log("Existing data was empty or invalid JSON");
+          }
+        
+          // If existing data is empty, use new data directly
+          const patient_record = Object.keys(existingData).length === 0 
+            ? newData 
+            : sophisticatedMergePatientData(existingData as any, newData);
+        
+          existingPayload.data = JSON.stringify(patient_record);
+        } catch (e) {
+          console.error('Error parsing payload data:', e);
+          throw e;
+        }
+
         existingPayload.timestamp = payload.timestamp;
         existingPayload.message = 'Updated payload';
         
