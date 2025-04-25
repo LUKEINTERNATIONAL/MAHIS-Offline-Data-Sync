@@ -5,6 +5,7 @@ import { PayloadDto } from './app.controller';
 import { Payload } from './payload.entity';
 import { generateQRCodeDataURL } from './utils/qrcode.util';
 import { getAPIHomePage } from './utils/htmlStr/html_responses';
+import { sophisticatedMergePatientData } from './utils/patient_record_utils'
 
 @Injectable()
 export class AppService {
@@ -48,7 +49,7 @@ export class AppService {
 
       if (existingPayload) {
         // Update existing record
-        existingPayload.data = payload.data;
+        existingPayload.data = sophisticatedMergePatientData(existingPayload.data as any, payload.data as any) as any;
         existingPayload.timestamp = payload.timestamp;
         existingPayload.message = 'Updated payload';
         
@@ -59,7 +60,8 @@ export class AppService {
           id: updatedPayload.id,
           patientID: updatedPayload.patientID,
           timestamp: new Date().toISOString(),
-          updated: true
+          updated: true,
+          record: existingPayload.data,
         };
       }
 
