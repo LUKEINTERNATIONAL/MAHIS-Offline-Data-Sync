@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { Payload } from './payload.entity';
+import { sophisticatedMergePatientData } from './utils/patient_record_utils'
 
 interface AuthResponse {
   authorization: {
@@ -153,7 +154,7 @@ export class DataSyncService {
               ...parsedData,
               timestamp: record.timestamp,
             }
-          };
+          } as any;
 
           // Send the data to the external API
           const { data: responseData } = await firstValueFrom(
@@ -185,9 +186,14 @@ export class DataSyncService {
           );
 
           // Update the local record with the API response
+          let responseString = JSON.stringify(responseData);;
           if (responseData) {
             // Convert the response data to string for storage
-            const responseString = JSON.stringify(responseData);
+            if (syncPayload.record && syncPayload.record.patientID == responseData.patientID) {
+              const updated_patient_record = sophisticatedMergePatientData(syncPayload.record as any, responseData as any) as any;
+              responseString = JSON.stringify(updated_patient_record);
+            }
+
             
             // Update the local database record
             await this.payloadRepository.update(

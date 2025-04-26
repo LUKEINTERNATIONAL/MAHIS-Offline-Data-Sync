@@ -491,439 +491,685 @@ interface PatientData {
   /**
  * Performs a sophisticated deep merge of patient data objects
  * that intelligently handles nested structures, arrays, and special medical data
+ * with improved handling of saved/unsaved relationships
  */
 export function sophisticatedMergePatientData(existingData: PatientData, incomingData: PatientData): PatientData {
-    // Ensure we're working with the same patient
-    if (existingData.patientID !== incomingData.patientID) {
-      throw new Error(`Cannot merge data for different patients: patientID ${incomingData.patientID}`);
-    }
-  
-    // Create a deep clone of the existing data as our starting point
-    const mergedData = JSON.parse(JSON.stringify(existingData)) as PatientData;
-  
-    // Merge top-level primitive properties
-    for (const key in incomingData) {
-      if (typeof incomingData[key] !== 'object' || incomingData[key] === null) {
-        mergedData[key] = incomingData[key];
-      }
-    }
-  
-    // Merge person information
-    if (incomingData.personInformation) {
-      mergedData.personInformation = mergeObjects(
-        mergedData.personInformation || {},
-        incomingData.personInformation
-      );
-    }
-  
-    // Merge guardian information
-    if (incomingData.guardianInformation) {
-      mergedData.guardianInformation = mergedData.guardianInformation || { saved: [], unsaved: [] };
-      
-      // Merge saved guardians by relationship_id
-      if (incomingData.guardianInformation.saved) {
-        mergedData.guardianInformation.saved = mergeArraysById(
-          mergedData.guardianInformation.saved || [],
-          incomingData.guardianInformation.saved,
-          'relationship_id'
-        );
-      }
-      
-      // Replace unsaved guardians (since they're temporary by nature)
-      if (incomingData.guardianInformation.unsaved) {
-        mergedData.guardianInformation.unsaved = [...incomingData.guardianInformation.unsaved];
-      }
-    }
-  
-    // Merge birth registration data
-    if (incomingData.birthRegistration) {
-      mergedData.birthRegistration = mergeArraysById(
-        mergedData.birthRegistration || [],
-        incomingData.birthRegistration,
-        'concept_id'
-      );
-    }
-  
-    // Merge vitals
-    if (incomingData.vitals) {
-      mergedData.vitals = mergedData.vitals || { saved: [], unsaved: [] };
-      
-      // Merge saved vitals by obs_id if available, otherwise by concept_id
-      if (incomingData.vitals.saved) {
-        mergedData.vitals.saved = mergeVitalsData(
-          mergedData.vitals.saved || [],
-          incomingData.vitals.saved
-        );
-      }
-      
-      // Replace unsaved vitals with incoming data
-      if (incomingData.vitals.unsaved) {
-        mergedData.vitals.unsaved = [...incomingData.vitals.unsaved];
-      }
-    }
-  
-    // Merge vaccine schedule
-    if (incomingData.vaccineSchedule?.vaccine_schedule) {
-      mergedData.vaccineSchedule = mergedData.vaccineSchedule || { vaccine_schedule: [] };
-      mergedData.vaccineSchedule.vaccine_schedule = mergeVaccineSchedule(
-        mergedData.vaccineSchedule.vaccine_schedule,
-        incomingData.vaccineSchedule.vaccine_schedule
-      );
-    }
-  
-    // Merge vaccine administration
-    if (incomingData.vaccineAdministration) {
-      mergedData.vaccineAdministration = mergedData.vaccineAdministration || { orders: [], obs: [], voided: [] };
-      
-      // Merge orders by order_id
-      if (incomingData.vaccineAdministration.orders) {
-        mergedData.vaccineAdministration.orders = mergeArraysById(
-          mergedData.vaccineAdministration.orders,
-          incomingData.vaccineAdministration.orders,
-          'order_id'
-        );
-      }
-      
-      // Merge obs by obs_id
-      if (incomingData.vaccineAdministration.obs) {
-        mergedData.vaccineAdministration.obs = mergeArraysById(
-          mergedData.vaccineAdministration.obs,
-          incomingData.vaccineAdministration.obs,
-          'obs_id'
-        );
-      }
-      
-      // Replace voided items
-      if (incomingData.vaccineAdministration.voided) {
-        mergedData.vaccineAdministration.voided = [
-          ...mergedData.vaccineAdministration.voided,
-          ...incomingData.vaccineAdministration.voided
-        ];
-      }
-    }
-  
-    // Merge appointments
-    if (incomingData.appointments) {
-      mergedData.appointments = mergedData.appointments || { saved: [], unsaved: [] };
-      
-      // Merge saved appointments by obs_id or based on datetime
-      if (incomingData.appointments.saved) {
-        mergedData.appointments.saved = mergeAppointments(
-          mergedData.appointments.saved,
-          incomingData.appointments.saved
-        );
-      }
-      
-      // Replace unsaved appointments
-      if (incomingData.appointments.unsaved) {
-        mergedData.appointments.unsaved = [...incomingData.appointments.unsaved];
-      }
-    }
-  
-    // Merge diagnosis
-    if (incomingData.diagnosis) {
-      mergedData.diagnosis = mergedData.diagnosis || { saved: [], unsaved: [] };
-      
-      // Merge saved diagnoses by obs_id
-      if (incomingData.diagnosis.saved) {
-        mergedData.diagnosis.saved = mergeArraysById(
-          mergedData.diagnosis.saved,
-          incomingData.diagnosis.saved,
-          'obs_id'
-        );
-      }
-      
-      // Replace unsaved diagnoses
-      if (incomingData.diagnosis.unsaved) {
-        mergedData.diagnosis.unsaved = [...incomingData.diagnosis.unsaved];
-      }
-    }
-  
-    // Merge medication orders
-    if (incomingData.MedicationOrder) {
-      mergedData.MedicationOrder = mergedData.MedicationOrder || { saved: [], unsaved: [] };
-      
-      // Merge saved medication orders by order_id
-      if (incomingData.MedicationOrder.saved) {
-        mergedData.MedicationOrder.saved = mergeArraysById(
-          mergedData.MedicationOrder.saved,
-          incomingData.MedicationOrder.saved,
-          'order_id'
-        );
-      }
-      
-      // Handle special case of NCD_Drug_Orders within unsaved
-      if (incomingData.MedicationOrder.unsaved) {
-        mergedData.MedicationOrder.unsaved = mergeMedicationOrders(
-          mergedData.MedicationOrder.unsaved,
-          incomingData.MedicationOrder.unsaved
-        );
-      }
-    }
-  
-    // Handle any other sections similarly
-    // ...
-  
-    return mergedData;
+  // Ensure we're working with the same patient
+  if (existingData.patientID !== incomingData.patientID) {
+    throw new Error('Cannot merge data for different patients');
   }
-  
-  /**
-   * Merges two objects recursively
-   */
-  function mergeObjects(obj1: any, obj2: any): any {
-    const result = { ...obj1 };
+
+  // Create a deep clone of the existing data as our starting point
+  const mergedData = JSON.parse(JSON.stringify(existingData)) as PatientData;
+
+  // Merge top-level primitive properties
+  for (const key in incomingData) {
+    if (typeof incomingData[key] !== 'object' || incomingData[key] === null) {
+      mergedData[key] = incomingData[key];
+    }
+  }
+
+  // Merge person information
+  if (incomingData.personInformation) {
+    mergedData.personInformation = mergeObjects(
+      mergedData.personInformation || {},
+      incomingData.personInformation
+    );
+  }
+
+  // Merge guardian information with improved saved/unsaved handling
+  if (incomingData.guardianInformation) {
+    mergedData.guardianInformation = mergedData.guardianInformation || { saved: [], unsaved: [] };
     
-    for (const key in obj2) {
-      // If property doesn't exist in obj1, add it
-      if (!(key in result)) {
-        result[key] = obj2[key];
-      } 
-      // If both are objects, merge them recursively
-      else if (
-        obj2[key] !== null && 
-        typeof obj2[key] === 'object' && 
-        !Array.isArray(obj2[key]) &&
-        result[key] !== null && 
-        typeof result[key] === 'object' && 
-        !Array.isArray(result[key])
-      ) {
-        result[key] = mergeObjects(result[key], obj2[key]);
-      }
-      // Otherwise replace with obj2's value
-      else {
-        result[key] = obj2[key];
+    // First merge saved guardians by relationship_id
+    if (incomingData.guardianInformation.saved) {
+      mergedData.guardianInformation.saved = mergeArraysById(
+        mergedData.guardianInformation.saved || [],
+        incomingData.guardianInformation.saved,
+        'relationship_id'
+      );
+      
+      // Now handle transition from unsaved to saved
+      if (mergedData.guardianInformation.unsaved && mergedData.guardianInformation.unsaved.length > 0) {
+        // Filter out any unsaved items that now appear in saved
+        mergedData.guardianInformation.unsaved = mergedData.guardianInformation.unsaved.filter(unsavedItem => {
+          // Keep only items that don't have matching relationship_id in saved collection
+          return !mergedData.guardianInformation.saved.some(
+            savedItem => savedItem.relationship_id === unsavedItem.relationship_id
+          );
+        });
       }
     }
     
-    return result;
-  }
-  
-  /**
-   * Merges two arrays of objects based on a specified ID field
-   */
-  function mergeArraysById(arr1: any[], arr2: any[], idField: string): any[] {
-    if (!arr1 || arr1.length === 0) return [...arr2];
-    if (!arr2 || arr2.length === 0) return [...arr1];
-    
-    const result = [...arr1];
-    const idMap = new Map(result.map(item => [item[idField], item]));
-    
-    for (const item of arr2) {
-      const id = item[idField];
+    // Now add any new unsaved items from incoming data
+    if (incomingData.guardianInformation.unsaved && incomingData.guardianInformation.unsaved.length > 0) {
+      // Create a set of existing unsaved item IDs for quick lookup
+      const existingUnsavedIds = new Set(
+        mergedData.guardianInformation.unsaved.map(item => item.relationship_id)
+      );
       
-      if (id === undefined) {
-        // If no ID field, just add to the result
-        result.push(item);
-      } else if (!idMap.has(id)) {
-        // If ID doesn't exist in result, add it
-        result.push(item);
-        idMap.set(id, item);
-      } else {
-        // If ID exists, update the existing item
-        const existingItem = idMap.get(id);
-        const index = result.findIndex(r => r[idField] === id);
-        
-        // If objects, merge them, otherwise replace
-        if (typeof item === 'object' && typeof existingItem === 'object') {
-          result[index] = mergeObjects(existingItem, item);
+      // Add only new unsaved items
+      incomingData.guardianInformation.unsaved.forEach(unsavedItem => {
+        // If no ID or ID doesn't exist in our current unsaved collection, add it
+        if (!unsavedItem.relationship_id || !existingUnsavedIds.has(unsavedItem.relationship_id)) {
+          mergedData.guardianInformation.unsaved.push(unsavedItem);
         } else {
-          result[index] = item;
+          // Update existing unsaved item
+          const index = mergedData.guardianInformation.unsaved.findIndex(
+            item => item.relationship_id === unsavedItem.relationship_id
+          );
+          mergedData.guardianInformation.unsaved[index] = unsavedItem;
+        }
+      });
+    }
+  }
+
+  // Merge birth registration data
+  if (incomingData.birthRegistration) {
+    mergedData.birthRegistration = mergeArraysById(
+      mergedData.birthRegistration || [],
+      incomingData.birthRegistration,
+      'concept_id'
+    );
+  }
+
+  // Merge vitals with improved saved/unsaved handling
+  if (incomingData.vitals) {
+    mergedData.vitals = mergedData.vitals || { saved: [], unsaved: [] };
+    
+    // First merge saved vitals 
+    if (incomingData.vitals.saved) {
+      mergedData.vitals.saved = mergeVitalsData(
+        mergedData.vitals.saved || [],
+        incomingData.vitals.saved
+      );
+      
+      // Handle transition from unsaved to saved
+      if (mergedData.vitals.unsaved && mergedData.vitals.unsaved.length > 0) {
+        // Determine ID field to use
+        const idField = incomingData.vitals.saved.some(item => 'obs_id' in item) 
+          ? 'obs_id' 
+          : 'concept_id';
+        
+        // Keep only unsaved items that don't appear in saved collection
+        mergedData.vitals.unsaved = mergedData.vitals.unsaved.filter(unsavedItem => {
+          return !mergedData.vitals.saved.some(savedItem => {
+            // If using concept_id, also check datetime for more accurate matching
+            if (idField === 'concept_id' && unsavedItem.concept_id === savedItem.concept_id) {
+              return unsavedItem.obs_datetime === savedItem.obs_datetime;
+            }
+            return savedItem[idField] === unsavedItem[idField];
+          });
+        });
+      }
+    }
+    
+    // Now handle incoming unsaved vitals
+    if (incomingData.vitals.unsaved && incomingData.vitals.unsaved.length > 0) {
+      const idField = incomingData.vitals.unsaved.some(item => 'obs_id' in item) 
+        ? 'obs_id' 
+        : 'concept_id';
+      
+      // Create maps for quick lookups
+      const existingUnsavedMap = new Map();
+      mergedData.vitals.unsaved.forEach(item => {
+        if (idField === 'concept_id' && item.obs_datetime) {
+          existingUnsavedMap.set(`${item.concept_id}-${item.obs_datetime}`, item);
+        } else if (item[idField]) {
+          existingUnsavedMap.set(item[idField], item);
+        }
+      });
+      
+      // Add or update unsaved items
+      incomingData.vitals.unsaved.forEach(item => {
+        let key;
+        if (idField === 'concept_id' && item.obs_datetime) {
+          key = `${item.concept_id}-${item.obs_datetime}`;
+        } else {
+          key = item[idField];
+        }
+        
+        if (!key || !existingUnsavedMap.has(key)) {
+          // Add new unsaved item
+          mergedData.vitals.unsaved.push(item);
+        } else {
+          // Update existing unsaved item
+          const index = mergedData.vitals.unsaved.findIndex(unsavedItem => {
+            if (idField === 'concept_id' && item.obs_datetime) {
+              return unsavedItem.concept_id === item.concept_id && 
+                     unsavedItem.obs_datetime === item.obs_datetime;
+            }
+            return unsavedItem[idField] === item[idField];
+          });
+          mergedData.vitals.unsaved[index] = item;
+        }
+      });
+    }
+  }
+
+  // Merge vaccine schedule
+  if (incomingData.vaccineSchedule?.vaccine_schedule) {
+    mergedData.vaccineSchedule = mergedData.vaccineSchedule || { vaccine_schedule: [] };
+    mergedData.vaccineSchedule.vaccine_schedule = mergeVaccineSchedule(
+      mergedData.vaccineSchedule.vaccine_schedule,
+      incomingData.vaccineSchedule.vaccine_schedule
+    );
+  }
+
+  // Merge vaccine administration with improved saved/unsaved handling
+  if (incomingData.vaccineAdministration) {
+    mergedData.vaccineAdministration = mergedData.vaccineAdministration || { orders: [], obs: [], voided: [] };
+    
+    // Merge orders by order_id
+    if (incomingData.vaccineAdministration.orders) {
+      mergedData.vaccineAdministration.orders = mergeArraysById(
+        mergedData.vaccineAdministration.orders,
+        incomingData.vaccineAdministration.orders,
+        'order_id'
+      );
+    }
+    
+    // Merge obs by obs_id
+    if (incomingData.vaccineAdministration.obs) {
+      mergedData.vaccineAdministration.obs = mergeArraysById(
+        mergedData.vaccineAdministration.obs,
+        incomingData.vaccineAdministration.obs,
+        'obs_id'
+      );
+    }
+    
+    // Handle voided items with deduplication
+    if (incomingData.vaccineAdministration.voided) {
+      // Create a set of existing voided IDs for quick lookup
+      const existingVoidedSet = new Set(mergedData.vaccineAdministration.voided);
+      
+      // Add only new voided items to avoid duplicates
+      incomingData.vaccineAdministration.voided.forEach(voidedItem => {
+        if (!existingVoidedSet.has(voidedItem)) {
+          mergedData.vaccineAdministration.voided.push(voidedItem);
+          existingVoidedSet.add(voidedItem);
+        }
+      });
+    }
+  }
+
+  // Merge appointments with improved saved/unsaved handling
+  if (incomingData.appointments) {
+    mergedData.appointments = mergedData.appointments || { saved: [], unsaved: [] };
+    
+    // First handle saved appointments
+    if (incomingData.appointments.saved) {
+      mergedData.appointments.saved = mergeAppointments(
+        mergedData.appointments.saved,
+        incomingData.appointments.saved
+      );
+      
+      // Handle transition from unsaved to saved
+      if (mergedData.appointments.unsaved && mergedData.appointments.unsaved.length > 0) {
+        // Determine matching criteria
+        const hasObsId = incomingData.appointments.saved.some(item => 'obs_id' in item);
+        
+        // Filter out any unsaved appointments that now appear in saved
+        mergedData.appointments.unsaved = mergedData.appointments.unsaved.filter(unsavedItem => {
+          return !mergedData.appointments.saved.some(savedItem => {
+            if (hasObsId && savedItem.obs_id && unsavedItem.obs_id) {
+              return savedItem.obs_id === unsavedItem.obs_id;
+            }
+            // Match by concept_id and value_datetime
+            return savedItem.concept_id === unsavedItem.concept_id && 
+                   savedItem.value_datetime === unsavedItem.value_datetime;
+          });
+        });
+      }
+    }
+    
+    // Now handle unsaved appointments
+    if (incomingData.appointments.unsaved && incomingData.appointments.unsaved.length > 0) {
+      const hasObsId = incomingData.appointments.unsaved.some(item => 'obs_id' in item);
+      
+      // Create maps for quick lookups
+      const existingUnsavedMap = new Map();
+      mergedData.appointments.unsaved.forEach(item => {
+        if (hasObsId && item.obs_id) {
+          existingUnsavedMap.set(item.obs_id, item);
+        } else if (item.concept_id && item.value_datetime) {
+          existingUnsavedMap.set(`${item.concept_id}-${item.value_datetime}`, item);
+        }
+      });
+      
+      // Add or update unsaved appointments
+      incomingData.appointments.unsaved.forEach(item => {
+        let key;
+        if (hasObsId && item.obs_id) {
+          key = item.obs_id;
+        } else if (item.concept_id && item.value_datetime) {
+          key = `${item.concept_id}-${item.value_datetime}`;
+        }
+        
+        if (!key || !existingUnsavedMap.has(key)) {
+          // Add new unsaved appointment
+          mergedData.appointments.unsaved.push(item);
+        } else {
+          // Update existing unsaved appointment
+          const index = mergedData.appointments.unsaved.findIndex(unsavedItem => {
+            if (hasObsId && item.obs_id) {
+              return unsavedItem.obs_id === item.obs_id;
+            }
+            return unsavedItem.concept_id === item.concept_id && 
+                   unsavedItem.value_datetime === item.value_datetime;
+          });
+          mergedData.appointments.unsaved[index] = item;
+        }
+      });
+    }
+  }
+
+  // Merge diagnosis with improved saved/unsaved handling
+  if (incomingData.diagnosis) {
+    mergedData.diagnosis = mergedData.diagnosis || { saved: [], unsaved: [] };
+    
+    // First handle saved diagnoses
+    if (incomingData.diagnosis.saved) {
+      mergedData.diagnosis.saved = mergeArraysById(
+        mergedData.diagnosis.saved,
+        incomingData.diagnosis.saved,
+        'obs_id'
+      );
+      
+      // Handle transition from unsaved to saved
+      if (mergedData.diagnosis.unsaved && mergedData.diagnosis.unsaved.length > 0) {
+        // Filter out unsaved diagnoses that now appear in saved
+        mergedData.diagnosis.unsaved = mergedData.diagnosis.unsaved.filter(unsavedItem => {
+          // If the unsaved item has an obs_id, check if it's now in saved
+          if (unsavedItem.obs_id) {
+            return !mergedData.diagnosis.saved.some(
+              savedItem => savedItem.obs_id === unsavedItem.obs_id
+            );
+          }
+          return true; // Keep items without obs_id
+        });
+      }
+    }
+    
+    // Now handle incoming unsaved diagnoses
+    if (incomingData.diagnosis.unsaved && incomingData.diagnosis.unsaved.length > 0) {
+      // Create map of existing unsaved diagnoses
+      const existingUnsavedMap = new Map();
+      mergedData.diagnosis.unsaved.forEach(item => {
+        if (item.obs_id) {
+          existingUnsavedMap.set(item.obs_id, item);
+        } else if (item.concept_id && item.obs_datetime) {
+          existingUnsavedMap.set(`${item.concept_id}-${item.obs_datetime}`, item);
+        }
+      });
+      
+      // Add or update unsaved diagnoses
+      incomingData.diagnosis.unsaved.forEach(item => {
+        let key;
+        if (item.obs_id) {
+          key = item.obs_id;
+        } else if (item.concept_id && item.obs_datetime) {
+          key = `${item.concept_id}-${item.obs_datetime}`;
+        }
+        
+        if (!key || !existingUnsavedMap.has(key)) {
+          // Add new unsaved diagnosis
+          mergedData.diagnosis.unsaved.push(item);
+        } else {
+          // Update existing unsaved diagnosis
+          const index = mergedData.diagnosis.unsaved.findIndex(unsavedItem => {
+            if (item.obs_id) {
+              return unsavedItem.obs_id === item.obs_id;
+            }
+            return unsavedItem.concept_id === item.concept_id && 
+                   unsavedItem.obs_datetime === item.obs_datetime;
+          });
+          mergedData.diagnosis.unsaved[index] = item;
+        }
+      });
+    }
+  }
+
+  // Merge medication orders with improved saved/unsaved handling
+  if (incomingData.MedicationOrder) {
+    mergedData.MedicationOrder = mergedData.MedicationOrder || { saved: [], unsaved: [] };
+    
+    // First handle saved medication orders
+    if (incomingData.MedicationOrder.saved) {
+      mergedData.MedicationOrder.saved = mergeArraysById(
+        mergedData.MedicationOrder.saved,
+        incomingData.MedicationOrder.saved,
+        'order_id'
+      );
+      
+      // Handle transition from unsaved to saved
+      if (mergedData.MedicationOrder.unsaved && mergedData.MedicationOrder.unsaved.length > 0) {
+        // Filter out NCD_Drug_Orders section specially
+        mergedData.MedicationOrder.unsaved = mergedData.MedicationOrder.unsaved.filter(unsavedItem => {
+          // Handle NCD_Drug_Orders section
+          if (unsavedItem.NCD_Drug_Orders) {
+            // Keep this section but filter its contents
+            unsavedItem.NCD_Drug_Orders = unsavedItem.NCD_Drug_Orders.filter(drug => {
+              // Keep only drugs that don't have matching entries in saved orders
+              return !mergedData.MedicationOrder.saved.some(savedItem => 
+                savedItem.drug_inventory_id === drug.drug_inventory_id
+              );
+            });
+            // If no drugs left, remove the entire section
+            return unsavedItem.NCD_Drug_Orders.length > 0;
+          }
+          
+          // For regular medication orders, check by order_id
+          if (unsavedItem.order_id) {
+            return !mergedData.MedicationOrder.saved.some(
+              savedItem => savedItem.order_id === unsavedItem.order_id
+            );
+          }
+          return true; // Keep items without order_id
+        });
+      }
+    }
+    
+    // Now handle incoming unsaved medication orders
+    if (incomingData.MedicationOrder.unsaved && incomingData.MedicationOrder.unsaved.length > 0) {
+      // This is more complex due to NCD_Drug_Orders special handling
+      // First handle NCD_Drug_Orders separately
+      
+      // Find existing NCD_Drug_Orders section
+      let existingNcdIndex = mergedData.MedicationOrder.unsaved.findIndex(
+        item => item.NCD_Drug_Orders
+      );
+      
+      // Find incoming NCD_Drug_Orders section
+      let incomingNcdIndex = incomingData.MedicationOrder.unsaved.findIndex(
+        item => item.NCD_Drug_Orders
+      );
+      
+      if (incomingNcdIndex >= 0) {
+        const incomingNcdOrders = incomingData.MedicationOrder.unsaved[incomingNcdIndex];
+        
+        if (existingNcdIndex >= 0) {
+          // Update existing NCD section
+          mergedData.MedicationOrder.unsaved[existingNcdIndex].NCD_Drug_Orders = 
+            mergeNcdDrugOrders(
+              mergedData.MedicationOrder.unsaved[existingNcdIndex].NCD_Drug_Orders,
+              incomingNcdOrders.NCD_Drug_Orders
+            );
+          
+          // Remove the NCD section from incoming to avoid duplication
+          incomingData.MedicationOrder.unsaved = incomingData.MedicationOrder.unsaved.filter(
+            (_, index) => index !== incomingNcdIndex
+          );
+        } else {
+          // Add the NCD section
+          mergedData.MedicationOrder.unsaved.push(incomingNcdOrders);
+          
+          // Remove the NCD section from incoming to avoid duplication
+          incomingData.MedicationOrder.unsaved = incomingData.MedicationOrder.unsaved.filter(
+            (_, index) => index !== incomingNcdIndex
+          );
         }
       }
-    }
-    
-    return result;
-  }
-  
-  /**
-   * Merges vitals data with special handling for obs_datetime
-   */
-  function mergeVitalsData(existing: any[], incoming: any[]): any[] {
-    // First try to merge by obs_id if available
-    if (incoming.some(item => 'obs_id' in item)) {
-      return mergeArraysById(existing, incoming, 'obs_id');
-    }
-    
-    // If no obs_id, try to match by concept_id and obs_datetime
-    const result = [...existing];
-    
-    for (const item of incoming) {
-      if (!item.concept_id || !item.obs_datetime) {
-        result.push(item);
-        continue;
-      }
       
-      // Try to find matching item
-      const index = result.findIndex(
-        r => r.concept_id === item.concept_id && r.obs_datetime === item.obs_datetime
-      );
+      // Now handle regular medication orders
+      // Create map of existing unsaved orders
+      const existingUnsavedMap = new Map();
+      mergedData.MedicationOrder.unsaved.forEach(item => {
+        if (item.order_id && !item.NCD_Drug_Orders) {
+          existingUnsavedMap.set(item.order_id, item);
+        }
+      });
       
-      if (index >= 0) {
-        // Update existing item
-        result[index] = { ...result[index], ...item };
-      } else {
-        // Add new item
-        result.push(item);
-      }
-    }
-    
-    return result;
-  }
-  
-  /**
-   * Merges vaccine schedules with special handling for visits and antigens
-   */
-  function mergeVaccineSchedule(existing: any[], incoming: any[]): any[] {
-    if (!existing || existing.length === 0) return [...incoming];
-    if (!incoming || incoming.length === 0) return [...existing];
-    
-    // Create a map of existing visits by visit number
-    const visitMap = new Map(existing.map(visit => [visit.visit, visit]));
-    const result = [...existing];
-    
-    for (const incomingVisit of incoming) {
-      if (!visitMap.has(incomingVisit.visit)) {
-        // This is a new visit
-        result.push(incomingVisit);
-        continue;
-      }
-      
-      // Get the existing visit
-      const existingVisit = visitMap.get(incomingVisit.visit);
-      const visitIndex = result.findIndex(v => v.visit === incomingVisit.visit);
-      
-      // Update milestone status if changed
-      if (incomingVisit.milestone_status !== existingVisit.milestone_status) {
-        result[visitIndex].milestone_status = incomingVisit.milestone_status;
-      }
-      
-      // Merge antigens
-      if (incomingVisit.antigens && incomingVisit.antigens.length > 0) {
-        // Create a map of existing antigens by drug_id
-        const antigenMap = new Map(existingVisit.antigens.map(a => [a.drug_id, a]));
-        
-        for (const incomingAntigen of incomingVisit.antigens) {
-          if (!antigenMap.has(incomingAntigen.drug_id)) {
-            // New antigen
-            result[visitIndex].antigens.push(incomingAntigen);
+      // Add or update regular unsaved orders
+      incomingData.MedicationOrder.unsaved.forEach(item => {
+        if (!item.NCD_Drug_Orders && item.order_id) {
+          if (!existingUnsavedMap.has(item.order_id)) {
+            // Add new unsaved order
+            mergedData.MedicationOrder.unsaved.push(item);
           } else {
-            // Update existing antigen
-            const antigenIndex = result[visitIndex].antigens.findIndex(
-              a => a.drug_id === incomingAntigen.drug_id
+            // Update existing unsaved order
+            const index = mergedData.MedicationOrder.unsaved.findIndex(
+              unsavedItem => unsavedItem.order_id === item.order_id
             );
-            
-            // Only update if status changed or date_administered added/changed
-            const existingAntigen = result[visitIndex].antigens[antigenIndex];
-            if (
-              incomingAntigen.status !== existingAntigen.status || 
-              incomingAntigen.date_administered !== existingAntigen.date_administered ||
-              incomingAntigen.can_administer !== existingAntigen.can_administer
-            ) {
-              result[visitIndex].antigens[antigenIndex] = {
-                ...existingAntigen,
-                status: incomingAntigen.status,
-                can_administer: incomingAntigen.can_administer,
-                date_administered: incomingAntigen.date_administered,
-                administered_by: incomingAntigen.administered_by,
-                vaccine_batch_number: incomingAntigen.vaccine_batch_number,
-                encounter_id: incomingAntigen.encounter_id,
-                order_id: incomingAntigen.order_id
-              };
-            }
+            mergedData.MedicationOrder.unsaved[index] = item;
+          }
+        } else if (!item.NCD_Drug_Orders) {
+          // Handle orders without order_id
+          mergedData.MedicationOrder.unsaved.push(item);
+        }
+      });
+    }
+  }
+
+  // Additional sections could be handled similarly with improved saved/unsaved handling
+  // ...
+
+  return mergedData;
+}
+
+/**
+ * Merges two objects recursively
+ */
+function mergeObjects(obj1: any, obj2: any): any {
+  const result = { ...obj1 };
+  
+  for (const key in obj2) {
+    // If property doesn't exist in obj1, add it
+    if (!(key in result)) {
+      result[key] = obj2[key];
+    } 
+    // If both are objects, merge them recursively
+    else if (
+      obj2[key] !== null && 
+      typeof obj2[key] === 'object' && 
+      !Array.isArray(obj2[key]) &&
+      result[key] !== null && 
+      typeof result[key] === 'object' && 
+      !Array.isArray(result[key])
+    ) {
+      result[key] = mergeObjects(result[key], obj2[key]);
+    }
+    // Otherwise replace with obj2's value
+    else {
+      result[key] = obj2[key];
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Merges two arrays of objects based on a specified ID field
+ */
+function mergeArraysById(arr1: any[], arr2: any[], idField: string): any[] {
+  if (!arr1 || arr1.length === 0) return [...arr2];
+  if (!arr2 || arr2.length === 0) return [...arr1];
+  
+  const result = [...arr1];
+  const idMap = new Map(result.map(item => [item[idField], item]));
+  
+  for (const item of arr2) {
+    const id = item[idField];
+    
+    if (id === undefined) {
+      // If no ID field, just add to the result
+      result.push(item);
+    } else if (!idMap.has(id)) {
+      // If ID doesn't exist in result, add it
+      result.push(item);
+      idMap.set(id, item);
+    } else {
+      // If ID exists, update the existing item
+      const existingItem = idMap.get(id);
+      const index = result.findIndex(r => r[idField] === id);
+      
+      // If objects, merge them, otherwise replace
+      if (typeof item === 'object' && typeof existingItem === 'object') {
+        result[index] = mergeObjects(existingItem, item);
+      } else {
+        result[index] = item;
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Merges vitals data with special handling for obs_datetime
+ */
+function mergeVitalsData(existing: any[], incoming: any[]): any[] {
+  // First try to merge by obs_id if available
+  if (incoming.some(item => 'obs_id' in item)) {
+    return mergeArraysById(existing, incoming, 'obs_id');
+  }
+  
+  // If no obs_id, try to match by concept_id and obs_datetime
+  const result = [...existing];
+  
+  for (const item of incoming) {
+    if (!item.concept_id || !item.obs_datetime) {
+      result.push(item);
+      continue;
+    }
+    
+    // Try to find matching item
+    const index = result.findIndex(
+      r => r.concept_id === item.concept_id && r.obs_datetime === item.obs_datetime
+    );
+    
+    if (index >= 0) {
+      // Update existing item
+      result[index] = { ...result[index], ...item };
+    } else {
+      // Add new item
+      result.push(item);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Merges vaccine schedules with special handling for visits and antigens
+ */
+function mergeVaccineSchedule(existing: any[], incoming: any[]): any[] {
+  if (!existing || existing.length === 0) return [...incoming];
+  if (!incoming || incoming.length === 0) return [...existing];
+  
+  // Create a map of existing visits by visit number
+  const visitMap = new Map(existing.map(visit => [visit.visit, visit]));
+  const result = [...existing];
+  
+  for (const incomingVisit of incoming) {
+    if (!visitMap.has(incomingVisit.visit)) {
+      // This is a new visit
+      result.push(incomingVisit);
+      continue;
+    }
+    
+    // Get the existing visit
+    const existingVisit = visitMap.get(incomingVisit.visit);
+    const visitIndex = result.findIndex(v => v.visit === incomingVisit.visit);
+    
+    // Update milestone status if changed
+    if (incomingVisit.milestone_status !== existingVisit.milestone_status) {
+      result[visitIndex].milestone_status = incomingVisit.milestone_status;
+    }
+    
+    // Merge antigens
+    if (incomingVisit.antigens && incomingVisit.antigens.length > 0) {
+      // Create a map of existing antigens by drug_id
+      const antigenMap = new Map(existingVisit.antigens.map(a => [a.drug_id, a]));
+      
+      for (const incomingAntigen of incomingVisit.antigens) {
+        if (!antigenMap.has(incomingAntigen.drug_id)) {
+          // New antigen
+          result[visitIndex].antigens.push(incomingAntigen);
+        } else {
+          // Update existing antigen
+          const antigenIndex = result[visitIndex].antigens.findIndex(
+            a => a.drug_id === incomingAntigen.drug_id
+          );
+          
+          // Only update if status changed or date_administered added/changed
+          const existingAntigen = result[visitIndex].antigens[antigenIndex];
+          if (
+            incomingAntigen.status !== existingAntigen.status || 
+            incomingAntigen.date_administered !== existingAntigen.date_administered ||
+            incomingAntigen.can_administer !== existingAntigen.can_administer
+          ) {
+            result[visitIndex].antigens[antigenIndex] = {
+              ...existingAntigen,
+              status: incomingAntigen.status,
+              can_administer: incomingAntigen.can_administer,
+              date_administered: incomingAntigen.date_administered,
+              administered_by: incomingAntigen.administered_by,
+              vaccine_batch_number: incomingAntigen.vaccine_batch_number,
+              encounter_id: incomingAntigen.encounter_id,
+              order_id: incomingAntigen.order_id
+            };
           }
         }
       }
     }
-    
-    return result;
   }
   
-  /**
-   * Merges appointment data based on concept_id and value_datetime
-   */
-  function mergeAppointments(existing: any[], incoming: any[]): any[] {
-    // First try to merge by obs_id if available
-    if (incoming.some(item => 'obs_id' in item)) {
-      return mergeArraysById(existing, incoming, 'obs_id');
-    }
-    
-    // If no obs_id, try to match by concept_id and value_datetime
-    const result = [...existing];
-    
-    for (const item of incoming) {
-      if (!item.concept_id || !item.value_datetime) {
-        result.push(item);
-        continue;
-      }
-      
-      // Try to find matching appointment
-      const index = result.findIndex(
-        r => r.concept_id === item.concept_id && r.value_datetime === item.value_datetime
-      );
-      
-      if (index >= 0) {
-        // Update existing appointment
-        result[index] = { ...result[index], ...item };
-      } else {
-        // Add new appointment
-        result.push(item);
-      }
-    }
-    
-    return result;
+  return result;
+}
+
+/**
+ * Merges appointment data based on concept_id and value_datetime
+ */
+function mergeAppointments(existing: any[], incoming: any[]): any[] {
+  // First try to merge by obs_id if available
+  if (incoming.some(item => 'obs_id' in item)) {
+    return mergeArraysById(existing, incoming, 'obs_id');
   }
   
-  /**
-   * Merges medication orders with special handling for NCD_Drug_Orders
-   */
-  function mergeMedicationOrders(existing: any[], incoming: any[]): any[] {
-    const result = [...existing];
-    
-    for (let i = 0; i < incoming.length; i++) {
-      const incomingOrder = incoming[i];
-      
-      // Try to find matching order in existing data
-      let matchFound = false;
-      
-      for (let j = 0; j < result.length; j++) {
-        // Check if this is an NCD_Drug_Orders section to merge
-        if (result[j].NCD_Drug_Orders && incomingOrder.NCD_Drug_Orders) {
-          // Merge the NCD drug orders
-          result[j].NCD_Drug_Orders = mergeNcdDrugOrders(
-            result[j].NCD_Drug_Orders,
-            incomingOrder.NCD_Drug_Orders
-          );
-          matchFound = true;
-          break;
-        }
-      }
-      
-      // If no match found, add the incoming order
-      if (!matchFound) {
-        result.push(incomingOrder);
-      }
+  // If no obs_id, try to match by concept_id and value_datetime
+  const result = [...existing];
+  
+  for (const item of incoming) {
+    if (!item.concept_id || !item.value_datetime) {
+      result.push(item);
+      continue;
     }
     
-    return result;
+    // Try to find matching appointment
+    const index = result.findIndex(
+      r => r.concept_id === item.concept_id && r.value_datetime === item.value_datetime
+    );
+    
+    if (index >= 0) {
+      // Update existing appointment
+      result[index] = { ...result[index], ...item };
+    } else {
+      // Add new appointment
+      result.push(item);
+    }
   }
   
-  /**
-   * Merges NCD drug orders by drug_inventory_id
-   */
-  function mergeNcdDrugOrders(existing: any[], incoming: any[]): any[] {
-    const result = [...existing];
-    const drugMap = new Map(result.map(drug => [drug.drug_inventory_id, drug]));
-    
-    for (const drug of incoming) {
-      if (!drugMap.has(drug.drug_inventory_id)) {
-        // New drug order
-        result.push(drug);
-      } else {
-        // Update existing drug order
-        const index = result.findIndex(d => d.drug_inventory_id === drug.drug_inventory_id);
-        result[index] = { ...result[index], ...drug };
-      }
+  return result;
+}
+
+/**
+ * Merges NCD drug orders by drug_inventory_id
+ */
+function mergeNcdDrugOrders(existing: any[], incoming: any[]): any[] {
+  const result = [...existing];
+  const drugMap = new Map(result.map(drug => [drug.drug_inventory_id, drug]));
+  
+  for (const drug of incoming) {
+    if (!drugMap.has(drug.drug_inventory_id)) {
+      // New drug order
+      result.push(drug);
+    } else {
+      // Update existing drug order
+      const index = result.findIndex(d => d.drug_inventory_id === drug.drug_inventory_id);
+      result[index] = { ...result[index], ...drug };
     }
-    
-    return result;
   }
+  
+  return result;
+}
