@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PayloadDto } from './app.controller';
@@ -11,7 +11,7 @@ import { sophisticatedMergePatientData } from './utils/patient_record_utils'
 export class AppService {
   constructor(
     @InjectRepository(Payload)
-    private payloadRepository: Repository<Payload>,
+    private readonly payloadRepository: Repository<Payload>,
   ) {}
 
   async getHome(): Promise<string> {
@@ -116,5 +116,20 @@ export class AppService {
       console.error('Error processing payload:', error);
       throw error;
     }
+  }
+
+  async getAllPatientIds(): Promise<string[]> {
+    const payloads = await this.payloadRepository.find({
+      select: ['patientID']
+    });
+    return payloads.map(payload => payload.patientID);
+  }
+
+  async getPatientPayload(patientId: string) {
+    const payload = await this.payloadRepository.findOne({
+      where: { patientID: patientId }
+    });
+    
+    return payload;
   }
 }

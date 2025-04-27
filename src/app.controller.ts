@@ -1,5 +1,5 @@
 // app.controller.ts
-import { Controller, Post, Body, Get, Header } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, Param, NotFoundException } from '@nestjs/common';
 import { AppService } from './app.service';
 
 // Define a DTO (Data Transfer Object) for the payload
@@ -24,5 +24,19 @@ export class AppController {
   async receivePayload(@Body() payload: PayloadDto) {
     // console.log('Received payload:', payload);
     return await this.appService.processPayload(payload);
+  }
+
+  @Get('patient-ids')
+  async getAllPatientIds(): Promise<string[]> {
+    return await this.appService.getAllPatientIds();
+  }
+
+  @Get('patient/:patientId/payload')
+  async getPatientPayload(@Param('patientId') patientId: string) {
+    const payload = await this.appService.getPatientPayload(patientId);
+    if (!payload) {
+      throw new NotFoundException(`Payload not found for patient ID ${patientId}`);
+    }
+    return JSON.parse(payload.data);
   }
 }
