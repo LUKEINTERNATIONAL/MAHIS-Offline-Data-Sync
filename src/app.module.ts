@@ -9,6 +9,8 @@ import { AppService } from './app.service';
 import { DataSyncService } from './app.dataSyncService';
 import { DataSyncScheduler } from './utils/data-sync.scheduler';
 import { Payload } from './payload.entity';
+import { AuthService } from './app.authService';
+import { User } from './entities/user.entity';
 
 @Module({
   imports: [
@@ -25,18 +27,20 @@ import { Payload } from './payload.entity';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'database.sqlite',
-      entities: [Payload],
+      entities: [Payload, User],
       synchronize: true, // Only use in development!
     }),
     
     // Register entities
-    TypeOrmModule.forFeature([Payload]),
+    TypeOrmModule.forFeature([Payload, User]),
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    AuthService,
     DataSyncService,
     DataSyncScheduler
   ],
+  exports: [AuthService, DataSyncService],
 })
 export class AppModule {}

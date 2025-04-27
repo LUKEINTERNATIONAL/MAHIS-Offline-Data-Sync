@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { DataSyncService } from './../app.dataSyncService';
+import { AuthService } from './../app.authService';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -11,6 +12,7 @@ export class DataSyncScheduler implements OnModuleInit {
   constructor(
     private readonly dataSyncService: DataSyncService,
     private configService: ConfigService,
+    private authService: AuthService,
   ) {
     // Get configuration from environment variables with defaults
     this.isEnabled = this.configService.get<string>('SYNC_SCHEDULER_ENABLED') !== 'false';
@@ -59,7 +61,9 @@ export class DataSyncScheduler implements OnModuleInit {
    * Perform the actual patient record sync operation
    */
   private async syncPatientRecords() {
+    await this.authService.fetchAndSaveUserData();
     const result = await this.dataSyncService.syncPatientRecords();
+    await this.authService.syncPatientIds()
     
     this.logger.log(`Sync operation completed: ${result.message}`);
     // if (result.failed > 0) {

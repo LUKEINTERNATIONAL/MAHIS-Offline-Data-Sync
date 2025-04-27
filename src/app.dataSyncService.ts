@@ -1,103 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { Payload } from './payload.entity';
-import { sophisticatedMergePatientData } from './utils/patient_record_utils'
-
-interface AuthResponse {
-  authorization: {
-    token: string;
-    expiry_time: string;
-  };
-}
+import { sophisticatedMergePatientData } from './utils/patient_record_utils';
+import { AuthService } from './app.authService';
 
 @Injectable()
 export class DataSyncService {
   private readonly logger = new Logger(DataSyncService.name);
-  private baseUrl: string;
-  private authToken: string | null = null;
-  private tokenExpiry: Date | null = null;
 
   constructor(
     private readonly httpService: HttpService,
-    private configService: ConfigService,
+    private authService: AuthService,
     @InjectRepository(Payload)
     private payloadRepository: Repository<Payload>,
-  ) {
-    // Get API base URL from environment variables or use default
-    this.baseUrl = this.configService.get<string>('API_BASE_URL') || 'http://localhost:3000';
-  }
-
-  /**
-   * Login to the API and get authentication token
-   */
-  async login(): Promise<boolean> {
-    try {
-      const loginUrl = `${this.baseUrl}/api/v1/auth/login`;
-      const loginData = {
-        username: 'ras',
-        password: 'Ras@2025',
-      };
-
-      this.logger.log(`Attempting to login to ${loginUrl}`);
-
-      const { data } = await firstValueFrom(
-        this.httpService.post<AuthResponse>(loginUrl, loginData).pipe(
-          catchError((error: AxiosError) => {
-            this.logger.error(`Login failed: ${error.message}`);
-            if (error.response) {
-              this.logger.error(`Response status: ${error.response.status}`);
-              this.logger.error(`Response data: ${JSON.stringify(error.response.data)}`);
-            }
-            throw new Error(`Authentication failed: ${error.message}`);
-          }),
-        ),
-      );
-
-      if (data && data.authorization && data.authorization.token) {
-        this.authToken = data.authorization.token;
-        this.tokenExpiry = new Date(data.authorization.expiry_time);
-        this.logger.log(`Login successful. Token valid until: ${this.tokenExpiry}`);
-        return true;
-      } else {
-        this.logger.error('Login response did not contain expected token data');
-        return false;
-      }
-    } catch (error) {
-      this.logger.error(`Login error: ${error.message}`, error.stack);
-      return false;
-    }
-  }
-
-  /**
-   * Check if the current token is valid
-   */
-  private isTokenValid(): boolean {
-    if (!this.authToken || !this.tokenExpiry) {
-      return false;
-    }
-
-    const now = new Date();
-    // Add 5 min buffer to ensure token doesn't expire during operation
-    const bufferTime = 5 * 60 * 1000; 
-    return this.tokenExpiry.getTime() > now.getTime() + bufferTime;
-  }
-
-  /**
-   * Ensures authentication before making API calls
-   */
-  private async ensureAuthenticated(): Promise<boolean> {
-    if (this.isTokenValid()) {
-      return true;
-    }
-    
-    this.logger.log('Authentication token missing or expired. Logging in again...');
-    return await this.login();
-  }
+  ) {}
 
   /**
    * Sync all patient records from the local database to the external API
@@ -105,7 +25,7 @@ export class DataSyncService {
   async syncPatientRecords() {
     try {
       // Ensure we have a valid token
-      const isAuthenticated = await this.ensureAuthenticated();
+      const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
         throw new Error('Failed to authenticate');
       }
@@ -122,7 +42,7 @@ export class DataSyncService {
       this.logger.log(`Found ${allRecords.length} records to sync`);
       
       // The endpoint for saving patient records
-      const saveUrl = `${this.baseUrl}/api/v1/save_patient_record`;
+      const saveUrl = `${this.authService.getBaseUrl()}/api/v1/save_patient_record`;
       
       // Track sync results
       const results = {
@@ -160,7 +80,7 @@ export class DataSyncService {
           const { data: responseData } = await firstValueFrom(
             this.httpService.post(saveUrl, syncPayload, {
               headers: {
-                Authorization: this.authToken,
+                Authorization: this.authService.getAuthToken(),
                 'Content-Type': 'application/json',
               },
             }).pipe(
@@ -179,21 +99,19 @@ export class DataSyncService {
                   error: error.message,
                 });
                 
-                // Return null to continue the loop
                 throw new Error(`API sync failed: ${error.message}`);
               }),
             ),
           );
 
           // Update the local record with the API response
-          let responseString = JSON.stringify(responseData);;
+          let responseString = JSON.stringify(responseData);
           if (responseData) {
-            // Convert the response data to string for storage
+            // Merge patient data if patient IDs match
             if (syncPayload.record && syncPayload.record.patientID == responseData.patientID) {
               const updated_patient_record = sophisticatedMergePatientData(syncPayload.record as any, responseData as any) as any;
               responseString = JSON.stringify(updated_patient_record);
             }
-
             
             // Update the local database record
             await this.payloadRepository.update(
@@ -237,12 +155,8 @@ export class DataSyncService {
    */
   async initialize(): Promise<void> {
     try {
-      const loggedIn = await this.login();
-      if (loggedIn) {
-        this.logger.log('DataSyncService initialized successfully');
-      } else {
-        this.logger.warn('DataSyncService initialized with failed authentication');
-      }
+      await this.authService.initialize();
+      this.logger.log('DataSyncService initialized successfully');
     } catch (error) {
       this.logger.error(`Failed to initialize DataSyncService: ${error.message}`);
     }
