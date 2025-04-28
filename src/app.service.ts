@@ -47,6 +47,8 @@ export class AppService {
         where: { patientID: payload.patientID }
       });
 
+      let hasChanges = false;
+
       if (existingPayload) {
         // Update existing record
         let patient_record = payload.data
@@ -61,7 +63,9 @@ export class AppService {
         if (existingData && Object.keys(existingData).length === 0) {
           console.log("Object is empty");
         } else if (existingData && Object.keys(existingData).length > 0) {
-          patient_record = sophisticatedMergePatientData( JSON.parse(existingPayload.data) as any, JSON.parse(payload.data) as any) as any;
+          const result = sophisticatedMergePatientData(existingData as any, JSON.parse(payload.data) as any);
+          patient_record = result.mergedData as any;
+          hasChanges = result.hasChanges;
         }
 
         try {
@@ -77,10 +81,13 @@ export class AppService {
           }
         
           // If existing data is empty, use new data directly
-          const patient_record = Object.keys(existingData).length === 0 
-            ? newData 
-            : sophisticatedMergePatientData(existingData as any, newData);
-        
+          const result = Object.keys(existingData).length === 0 
+            ? { mergedData: newData, hasChanges: false }
+            : sophisticatedMergePatientData(existingData as any, newData) as any;
+          const patient_record = result.mergedData;
+
+          hasChanges = result.hasChanges;
+
           existingPayload.data = JSON.stringify(patient_record);
         } catch (e) {
           console.error('Error parsing payload data:', e);
@@ -99,6 +106,7 @@ export class AppService {
           timestamp: new Date().toISOString(),
           updated: true,
           record: existingPayload.data,
+          hasChanges: hasChanges,
         };
       }
 
@@ -110,7 +118,8 @@ export class AppService {
         id: savedPayload.id,
         patientID: savedPayload.patientID,
         timestamp: new Date().toISOString(),
-        updated: false
+        updated: false,
+        hasChanges: hasChanges,
       };
     } catch (error) {
       console.error('Error processing payload:', error);

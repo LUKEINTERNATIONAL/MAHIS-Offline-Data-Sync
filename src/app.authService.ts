@@ -322,8 +322,8 @@ export class AuthService {
         if (existingPayload) {
             if (existingPayload.patientID == patient.patientID) {
                 this.logger.log(`Found existing payload for patient ID: ${patient.patientID}`);
-                const M_patient = sophisticatedMergePatientData(JSON.parse(existingPayload.data) as any, patient as any) as any;
-                existingPayload.data = JSON.stringify(M_patient);
+                const result = sophisticatedMergePatientData(JSON.parse(existingPayload.data) as any, patient as any) as any;
+                existingPayload.data = JSON.stringify(result.mergedData);
                 await this.payloadRepository.save(existingPayload);
             }
         } else {

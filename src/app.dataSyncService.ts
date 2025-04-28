@@ -109,8 +109,8 @@ export class DataSyncService {
           if (responseData) {
             // Merge patient data if patient IDs match
             if (syncPayload.record && syncPayload.record.patientID == responseData.patientID) {
-              const updated_patient_record = sophisticatedMergePatientData(syncPayload.record as any, responseData as any) as any;
-              responseString = JSON.stringify(updated_patient_record);
+              const result = sophisticatedMergePatientData(syncPayload.record as any, responseData as any) as any;
+              responseString = JSON.stringify(result.mergedData);
             }
             
             // Update the local database record

@@ -473,19 +473,20 @@ interface PatientData {
   }
   
   // Usage example
-  function updatePatientData(existingData: PatientData, incomingData: PatientData): PatientData {
+  function hasChanges(existingData: PatientData, incomingData: PatientData): { 
+    hasChanges: boolean;
+    changes: any[];
+  } {
     // First check if there are changes
     const { hasNewData, changes } = hasNewOrUpdatedData(existingData, incomingData);
     
     if (!hasNewData) {
       console.log('No changes detected');
-      return existingData;
+      return { hasChanges: false, changes: [] };
     }
     
-    console.log('Changes detected:', changes);
-    
-    // Apply the changes (in a real implementation, you'd want to be more careful about merging)
-    return { ...existingData, ...incomingData };
+    console.log(`Changes detected: ${existingData.patientID}`, changes);
+    return { hasChanges: true, changes };
   }
 
   /**
@@ -493,11 +494,28 @@ interface PatientData {
  * that intelligently handles nested structures, arrays, and special medical data
  * with improved handling of saved/unsaved relationships
  */
-export function sophisticatedMergePatientData(existingData: PatientData, incomingData: PatientData): PatientData {
+export function sophisticatedMergePatientData(existingData: PatientData, incomingData: PatientData): { 
+  mergedData: PatientData;
+  hasChanges: boolean;
+  changes: any[];
+} {
   // Ensure we're working with the same patient
   if (existingData.patientID !== incomingData.patientID) {
     throw new Error('Cannot merge data for different patients');
   }
+
+  // Check for changes first
+  const changeResult = hasChanges(existingData, incomingData);
+  if (!changeResult.hasChanges) {
+    return { 
+      mergedData: existingData,
+      hasChanges: false,
+      changes: [] 
+    }; 
+  }
+
+  // Log what changes were detected
+  console.log('Merging the following changes:', changeResult.changes);
 
   // Create a deep clone of the existing data as our starting point
   const mergedData = JSON.parse(JSON.stringify(existingData)) as PatientData;
@@ -944,7 +962,11 @@ export function sophisticatedMergePatientData(existingData: PatientData, incomin
   // Additional sections could be handled similarly with improved saved/unsaved handling
   // ...
 
-  return mergedData;
+  return {
+    mergedData,
+    hasChanges: true,
+    changes: changeResult.changes
+  };
 }
 
 /**
