@@ -19,7 +19,7 @@ export class AppService {
     const port = process.env.PORT || 3009;
     
     // For the QR code, use the current server address
-    const apiUrl = `http://${process.env.HOST || 'localhost'}:${port}/receive-payload`;
+    const apiUrl = `http://${process.env.HOST || '192.168.0.105'}:${port}/receive-payload`;
     
     // Generate QR code as data URL
     const qrCodeDataUrl = await generateQRCodeDataURL(apiUrl);

@@ -32,7 +32,7 @@ let AuthService = AuthService_1 = class AuthService {
         this.logger = new common_1.Logger(AuthService_1.name);
         this.authToken = null;
         this.tokenExpiry = null;
-        this.baseUrl = this.configService.get('API_BASE_URL') || 'http://localhost:3000';
+        this.baseUrl = this.configService.get('API_BASE_URL') || 'http://192.168.0.105:3000';
     }
     async login() {
         try {

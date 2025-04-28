@@ -26,7 +26,7 @@ let AppService = class AppService {
     }
     async getHome() {
         const port = process.env.PORT || 3009;
-        const apiUrl = `http://${process.env.HOST || 'localhost'}:${port}/receive-payload`;
+        const apiUrl = `http://${process.env.HOST || '192.168.0.105'}:${port}/receive-payload`;
         const qrCodeDataUrl = await (0, qrcode_util_1.generateQRCodeDataURL)(apiUrl);
         return (0, html_responses_1.getAPIHomePage)(port, apiUrl, qrCodeDataUrl);
     }

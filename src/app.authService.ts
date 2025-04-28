@@ -50,7 +50,7 @@ export class AuthService {
     @InjectRepository(Payload)
     private readonly payloadRepository: Repository<Payload>, // Add this line
   ) {
-    this.baseUrl = this.configService.get<string>('API_BASE_URL') || 'http://localhost:3000';
+    this.baseUrl = this.configService.get<string>('API_BASE_URL') || 'http://192.168.0.105:3000';
   }
 
   /**
