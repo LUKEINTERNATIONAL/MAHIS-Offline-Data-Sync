@@ -21,9 +21,10 @@ export class AppController {
   }
 
   @Post('receive-payload')
-  async receivePayload(@Body() payload: PayloadDto) {
-    // console.log('Received payload:', payload);
-    return await this.appService.processPayload(payload);
+  async receivePayload(@Body() payload: PayloadDto | PayloadDto[]) {
+    // Convert single payload to array if needed
+    const payloadArray = Array.isArray(payload) ? payload : [payload];
+    return await this.appService.processPayload(payloadArray);
   }
 
   @Get('patient-ids')
