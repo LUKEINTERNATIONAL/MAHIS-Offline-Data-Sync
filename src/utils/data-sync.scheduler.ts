@@ -63,6 +63,7 @@ export class DataSyncScheduler implements OnModuleInit {
   private async syncPatientRecords() {
     await this.authService.fetchAndSaveUserData();
     const result = await this.dataSyncService.syncPatientRecords();
+    // 	http://localhost:3000/api/v1//patients/6270/get_patient_record
     await this.authService.syncPatientIds()
     
     this.logger.log(`Sync operation completed: ${result.message}`);

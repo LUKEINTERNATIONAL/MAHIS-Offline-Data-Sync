@@ -107,6 +107,7 @@ export class DataSyncService {
           // Update the local record with the API response
           let responseString = JSON.stringify(responseData);
           if (responseData) {
+            console.log(responseData)
             // Merge patient data if patient IDs match
             if (syncPayload.record && syncPayload.record.patientID == responseData.patientID) {
               // const result = sophisticatedMergePatientData(syncPayload.record as any, responseData as any) as any;

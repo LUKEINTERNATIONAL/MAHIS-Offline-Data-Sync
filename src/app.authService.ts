@@ -48,9 +48,9 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(Payload)
-    private readonly payloadRepository: Repository<Payload>, // Add this line
+    private readonly payloadRepository: Repository<Payload>,
   ) {
-    this.baseUrl = this.configService.get<string>('API_BASE_URL') || 'http://192.168.0.105:3000';
+    this.baseUrl = this.configService.get<string>('API_BASE_URL');
   }
 
   /**
@@ -60,10 +60,8 @@ export class AuthService {
     try {
       const loginUrl = `${this.baseUrl}/api/v1/auth/login`;
       const loginData = {
-        username: this.configService.get<string>('API_USERNAME') || 'ras',
-        password: this.configService.get<string>('API_PASSWORD') || 'Ras@2025',
-        // username: this.configService.get<string>('API_USERNAME') || 'dominic',
-        // password: this.configService.get<string>('API_PASSWORD') || '123456',
+        username: this.configService.get<string>('API_USERNAME'),
+        password: this.configService.get<string>('API_PASSWORD'),
       };
 
       this.logger.log(`Attempting to login to ${loginUrl}`);
