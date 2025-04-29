@@ -27,104 +27,96 @@ export class AppService {
     return getAPIHomePage(port, apiUrl, qrCodeDataUrl);
   }
 
-  async processPayload(payloadDto: PayloadDto) {
-    // Create a new payload entity
-    const payload = new Payload();
-    payload.message = 'Received payload';
-    payload.data = payloadDto? JSON.stringify(payloadDto) : null;
-    payload.timestamp = payloadDto.timestamp || Date.now();
+  async processPayload(payloadDtos: PayloadDto[]) {
+    const results = [];
     
-    // Extract patientID from payload data or use from DTO if provided directly
-    if (payloadDto.patientID) {
-      payload.patientID = payloadDto.patientID;
-    } else if (payloadDto.data && payloadDto.data.patientID) {
-      payload.patientID = payloadDto.data.patientID;
+    for (const payloadDto of payloadDtos) {
+      // Create a new payload entity
+      const payload = new Payload();
+      payload.message = 'Received payload';
+      payload.data = payloadDto ? JSON.stringify(payloadDto) : null;
+      payload.timestamp = payloadDto.timestamp || Date.now();
+      
+      // Extract patientID from payload data or use from DTO if provided directly
+      if (payloadDto.patientID) {
+        payload.patientID = payloadDto.patientID;
+      } else if (payloadDto.data && payloadDto.data.patientID) {
+        payload.patientID = payloadDto.data.patientID;
+      }
+  
+      try {
+        // Check if patient record already exists
+        const existingPayload = await this.payloadRepository.findOne({
+          where: { patientID: payload.patientID }
+        });
+  
+        let hasChanges = false;
+  
+        if (existingPayload) {
+          try {
+            // Parse the incoming payload data
+            const newData = JSON.parse(payload.data);
+            
+            // Parse existing data or use empty object if parsing fails
+            let existingData = {};
+            try {
+              existingData = existingPayload.data ? JSON.parse(existingPayload.data) : {};
+            } catch (e) {
+              console.log("Existing data was empty or invalid JSON");
+            }
+          
+            // If existing data is empty, use new data directly
+            const result = Object.keys(existingData).length === 0 
+              ? { mergedData: newData, hasChanges: false }
+              : sophisticatedMergePatientData(existingData as any, newData) as any;
+            
+            hasChanges = result.hasChanges;
+            existingPayload.data = JSON.stringify(result.mergedData);
+          } catch (e) {
+            console.error('Error parsing payload data:', e);
+            throw e;
+          }
+  
+          existingPayload.timestamp = payload.timestamp;
+          existingPayload.message = 'Updated payload';
+          
+          const updatedPayload = await this.payloadRepository.save(existingPayload);
+          results.push({
+            success: true,
+            message: 'Payload updated successfully',
+            id: updatedPayload.id,
+            patientID: updatedPayload.patientID,
+            timestamp: new Date().toISOString(),
+            updated: true,
+            record: existingPayload.data,
+            hasChanges: hasChanges,
+          });
+        } else {
+          // Save new payload if no existing record found
+          const savedPayload = await this.payloadRepository.save(payload);
+          results.push({
+            success: true,
+            message: 'Payload received and saved successfully',
+            id: savedPayload.id,
+            patientID: savedPayload.patientID,
+            timestamp: new Date().toISOString(),
+            updated: false,
+            hasChanges: hasChanges,
+          });
+        }
+      } catch (error) {
+        console.error('Error processing payload:', error);
+        results.push({
+          success: false,
+          message: 'Error processing payload',
+          patientID: payload.patientID,
+          timestamp: new Date().toISOString(),
+          error: error.message,
+        });
+      }
     }
   
-    try {
-      // Check if patient record already exists
-      const existingPayload = await this.payloadRepository.findOne({
-        where: { patientID: payload.patientID }
-      });
-
-      let hasChanges = false;
-
-      if (existingPayload) {
-        // Update existing record
-        let patient_record = payload.data
-
-        let existingData;
-        try {
-          existingData = existingPayload.data ? JSON.parse(existingPayload.data) : {};
-        } catch (e) {
-          existingData = {};
-        }
-
-        if (existingData && Object.keys(existingData).length === 0) {
-          console.log("Object is empty");
-        } else if (existingData && Object.keys(existingData).length > 0) {
-          const result = sophisticatedMergePatientData(existingData as any, JSON.parse(payload.data) as any);
-          patient_record = result.mergedData as any;
-          hasChanges = result.hasChanges;
-        }
-
-        try {
-          // Parse the incoming payload data
-          const newData = JSON.parse(payload.data);
-          
-          // Parse existing data or use empty object if parsing fails
-          let existingData = {};
-          try {
-            existingData = existingPayload.data ? JSON.parse(existingPayload.data) : {};
-          } catch (e) {
-            console.log("Existing data was empty or invalid JSON");
-          }
-        
-          // If existing data is empty, use new data directly
-          const result = Object.keys(existingData).length === 0 
-            ? { mergedData: newData, hasChanges: false }
-            : sophisticatedMergePatientData(existingData as any, newData) as any;
-          const patient_record = result.mergedData;
-
-          hasChanges = result.hasChanges;
-
-          existingPayload.data = JSON.stringify(patient_record);
-        } catch (e) {
-          console.error('Error parsing payload data:', e);
-          throw e;
-        }
-
-        existingPayload.timestamp = payload.timestamp;
-        existingPayload.message = 'Updated payload';
-        
-        const updatedPayload = await this.payloadRepository.save(existingPayload);
-        return {
-          success: true,
-          message: 'Payload updated successfully',
-          id: updatedPayload.id,
-          patientID: updatedPayload.patientID,
-          timestamp: new Date().toISOString(),
-          updated: true,
-          record: existingPayload.data,
-          hasChanges: hasChanges,
-        };
-      }
-
-      // Save new payload if no existing record found
-      const savedPayload = await this.payloadRepository.save(payload);
-      return {
-        success: true,
-        message: 'Payload received and saved successfully',
-        id: savedPayload.id,
-        patientID: savedPayload.patientID,
-        timestamp: new Date().toISOString(),
-        updated: false,
-        hasChanges: hasChanges,
-      };
-    } catch (error) {
-      console.error('Error processing payload:', error);
-      throw error;
-    }
+    return results;
   }
 
   async getAllPatientIds(): Promise<string[]> {
