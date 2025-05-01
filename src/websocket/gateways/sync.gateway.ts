@@ -30,11 +30,12 @@ export class SyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('syncPatientData')
-  handlePatientSync(client: Socket, payload: any) {
-    // Broadcast to all connected clients except sender
-    client.broadcast.emit('patientDataChanged', {
-      deviceId: client.handshake.query.deviceId,
-      payload
-    });
+  handlePatientSync(client: Socket, payload: any): any {
+      client.broadcast.emit('patientDataChanged', {
+          deviceId: client.handshake.query.deviceId,
+          payload
+      });
+  
+      return { success: true };
   }
 }
