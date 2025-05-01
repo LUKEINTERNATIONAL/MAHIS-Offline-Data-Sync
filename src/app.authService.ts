@@ -319,9 +319,11 @@ export class AuthService {
 
         if (existingPayload) {
             if (existingPayload.patientID == patient.patientID) {
-                this.logger.log(`Found existing payload for patient ID: ${patient.patientID}`);
+                // this.logger.log(`Found existing payload for patient ID: ${patient.patientID}`);
                 // const result = sophisticatedMergePatientData(JSON.parse(existingPayload.data) as any, patient as any) as any;
                 // existingPayload.data = JSON.stringify(result.mergedData);
+                existingPayload.timestamp = Date.now();
+                existingPayload.message = 'Updated payload from API VIA ALL';
                 existingPayload.data = JSON.stringify(patient);
                 await this.payloadRepository.save(existingPayload);
             }

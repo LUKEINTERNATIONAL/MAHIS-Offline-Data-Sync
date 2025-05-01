@@ -1,3 +1,5 @@
+import { normalizeDate, createMedicationKey, deduplicateNcdDrugOrders} from './medication_order_utils'
+
 interface PatientData {
     patientID: number;
     ID: string;
@@ -859,103 +861,65 @@ export function sophisticatedMergePatientData(existingData: PatientData, incomin
         incomingData.MedicationOrder.saved,
         'order_id'
       );
-      
-      // Handle transition from unsaved to saved
-      if (mergedData.MedicationOrder.unsaved && mergedData.MedicationOrder.unsaved.length > 0) {
-        // Filter out NCD_Drug_Orders section specially
-        mergedData.MedicationOrder.unsaved = mergedData.MedicationOrder.unsaved.filter(unsavedItem => {
-          // Handle NCD_Drug_Orders section
-          if (unsavedItem.NCD_Drug_Orders) {
-            // Keep this section but filter its contents
-            unsavedItem.NCD_Drug_Orders = unsavedItem.NCD_Drug_Orders.filter(drug => {
-              // Keep only drugs that don't have matching entries in saved orders
-              return !mergedData.MedicationOrder.saved.some(savedItem => 
-                savedItem.drug_inventory_id === drug.drug_inventory_id
-              );
-            });
-            // If no drugs left, remove the entire section
-            return unsavedItem.NCD_Drug_Orders.length > 0;
-          }
-          
-          // For regular medication orders, check by order_id
-          if (unsavedItem.order_id) {
-            return !mergedData.MedicationOrder.saved.some(
-              savedItem => savedItem.order_id === unsavedItem.order_id
-            );
-          }
-          return true; // Keep items without order_id
-        });
-      }
     }
     
-    // Now handle incoming unsaved medication orders
-    if (incomingData.MedicationOrder.unsaved && incomingData.MedicationOrder.unsaved.length > 0) {
-      // This is more complex due to NCD_Drug_Orders special handling
-      // First handle NCD_Drug_Orders separately
+    // Handle unsaved medication orders with NCD_Drug_Orders deduplication
+    if (incomingData.MedicationOrder.unsaved?.length > 0) {
+      const savedMedications = mergedData.MedicationOrder.saved || [];
       
-      // Find existing NCD_Drug_Orders section
-      let existingNcdIndex = mergedData.MedicationOrder.unsaved.findIndex(
-        item => item.NCD_Drug_Orders
+      // Find NCD_Drug_Orders section
+      const ncdSectionIndex = incomingData.MedicationOrder.unsaved.findIndex(
+        item => item.NCD_Drug_Orders?.length > 0
       );
       
-      // Find incoming NCD_Drug_Orders section
-      let incomingNcdIndex = incomingData.MedicationOrder.unsaved.findIndex(
-        item => item.NCD_Drug_Orders
-      );
-      
-      if (incomingNcdIndex >= 0) {
-        const incomingNcdOrders = incomingData.MedicationOrder.unsaved[incomingNcdIndex];
+      if (ncdSectionIndex >= 0) {
+        const ncdSection = incomingData.MedicationOrder.unsaved[ncdSectionIndex];
         
-        if (existingNcdIndex >= 0) {
-          // Update existing NCD section
-          mergedData.MedicationOrder.unsaved[existingNcdIndex].NCD_Drug_Orders = 
-            mergeNcdDrugOrders(
-              mergedData.MedicationOrder.unsaved[existingNcdIndex].NCD_Drug_Orders,
-              incomingNcdOrders.NCD_Drug_Orders
-            );
-          
-          // Remove the NCD section from incoming to avoid duplication
-          incomingData.MedicationOrder.unsaved = incomingData.MedicationOrder.unsaved.filter(
-            (_, index) => index !== incomingNcdIndex
+        // Deduplicate NCD_Drug_Orders against saved medications
+        const deduplicatedNcdOrders = deduplicateNcdDrugOrders(
+          savedMedications,
+          ncdSection.NCD_Drug_Orders
+        );
+        
+        if (deduplicatedNcdOrders.length > 0) {
+          // Find existing NCD section in merged data
+          const existingNcdIndex = mergedData.MedicationOrder.unsaved.findIndex(
+            item => item.NCD_Drug_Orders?.length > 0
           );
-        } else {
-          // Add the NCD section
-          mergedData.MedicationOrder.unsaved.push(incomingNcdOrders);
           
-          // Remove the NCD section from incoming to avoid duplication
-          incomingData.MedicationOrder.unsaved = incomingData.MedicationOrder.unsaved.filter(
-            (_, index) => index !== incomingNcdIndex
-          );
+          if (existingNcdIndex >= 0) {
+            // Update existing section
+            mergedData.MedicationOrder.unsaved[existingNcdIndex].NCD_Drug_Orders = 
+              deduplicatedNcdOrders;
+          } else {
+            // Add new section with deduplicated orders
+            mergedData.MedicationOrder.unsaved.push({
+              ...ncdSection,
+              NCD_Drug_Orders: deduplicatedNcdOrders
+            });
+          }
         }
+        
+        // Remove processed NCD section from incoming data
+        incomingData.MedicationOrder.unsaved = incomingData.MedicationOrder.unsaved
+          .filter((_, index) => index !== ncdSectionIndex);
       }
       
-      // Now handle regular medication orders
-      // Create map of existing unsaved orders
-      const existingUnsavedMap = new Map();
-      mergedData.MedicationOrder.unsaved.forEach(item => {
-        if (item.order_id && !item.NCD_Drug_Orders) {
-          existingUnsavedMap.set(item.order_id, item);
-        }
-      });
+      // Handle remaining regular medication orders
+      const remainingOrders = incomingData.MedicationOrder.unsaved
+        .filter(order => !order.NCD_Drug_Orders)
+        .filter(order => {
+          if (!order.order_id || !order.drug_id) return true;
+          
+          // Deduplicate against saved medications
+          const key = createMedicationKey(order.drug_id, order.start_date);
+          return !savedMedications.some(saved => 
+            createMedicationKey(saved.drug_id, saved.start_date) === key
+          );
+        });
       
-      // Add or update regular unsaved orders
-      incomingData.MedicationOrder.unsaved.forEach(item => {
-        if (!item.NCD_Drug_Orders && item.order_id) {
-          if (!existingUnsavedMap.has(item.order_id)) {
-            // Add new unsaved order
-            mergedData.MedicationOrder.unsaved.push(item);
-          } else {
-            // Update existing unsaved order
-            const index = mergedData.MedicationOrder.unsaved.findIndex(
-              unsavedItem => unsavedItem.order_id === item.order_id
-            );
-            mergedData.MedicationOrder.unsaved[index] = item;
-          }
-        } else if (!item.NCD_Drug_Orders) {
-          // Handle orders without order_id
-          mergedData.MedicationOrder.unsaved.push(item);
-        }
-      });
+      // Add remaining deduplicated orders
+      mergedData.MedicationOrder.unsaved.push(...remainingOrders);
     }
   }
 
