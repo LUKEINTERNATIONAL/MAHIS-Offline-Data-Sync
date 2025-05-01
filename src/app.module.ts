@@ -11,6 +11,7 @@ import { DataSyncScheduler } from './utils/data-sync.scheduler';
 import { Payload } from './payload.entity';
 import { AuthService } from './app.authService';
 import { User } from './entities/user.entity';
+import { SyncGateway } from './websocket/gateways/sync.gateway';
 
 @Module({
   imports: [
@@ -39,7 +40,8 @@ import { User } from './entities/user.entity';
     AppService,
     AuthService,
     DataSyncService,
-    DataSyncScheduler
+    DataSyncScheduler,
+    SyncGateway,
   ],
   exports: [AuthService, DataSyncService],
 })
