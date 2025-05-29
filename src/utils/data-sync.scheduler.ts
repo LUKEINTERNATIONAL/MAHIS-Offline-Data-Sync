@@ -30,7 +30,8 @@ export class DataSyncScheduler implements OnModuleInit {
       if (this.isEnabled) {
         this.logger.log('Running initial patient record sync job after 120 second delay');
         try {
-          await this.syncPatientRecords();
+          // TODO: Uncomment the line below to enable initial sync
+          // await this.syncPatientRecords();
         } catch (error) {
           this.logger.error(`Initial sync failed: ${error.message}`);
         }
@@ -51,7 +52,8 @@ export class DataSyncScheduler implements OnModuleInit {
 
     try {
       this.logger.log('Starting scheduled patient record sync');
-      await this.syncPatientRecords();
+      // TODO: Uncomment the line below to enable scheduled sync
+      // await this.syncPatientRecords();
     } catch (error) {
       this.logger.error(`Scheduled sync failed: ${error.message}`, error.stack);
     }

@@ -21,4 +21,4 @@ export class TestType {
   name: string;
 }
 
-export const ConceptSchema = SchemaFactory.createForClass(TestType);
+export const TestTypeSchema = SchemaFactory.createForClass(TestType);

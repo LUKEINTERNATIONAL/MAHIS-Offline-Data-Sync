@@ -154,12 +154,10 @@ export class Patient {
 
   @Prop({
     type: Map,
-    of: Encounter,
+    of: SchemaFactory.createForClass(Encounter),
     default: {},
   })
   encounters: Record<string, Encounter>;
-
-  
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);
