@@ -68,8 +68,7 @@ export class AuthService {
 
       const { data } = await firstValueFrom(
         this.httpService.post<AuthResponse>(loginUrl, loginData)
-//TODO: uncomment the catchError block when you want to handle errors
-
+        
         // .pipe(
         //   catchError((error: AxiosError) => {
         //     this.logger.error(`Login failed: ${error.message}`);

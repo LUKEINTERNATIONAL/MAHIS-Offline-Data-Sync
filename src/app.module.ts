@@ -28,12 +28,14 @@ import { ProgramModule } from "./modules/programs/program.module";
 import { TestTypeModule } from "./modules/testTypes/test-type.module";
 import { FacilityModule } from "./modules/facilities/facilities,module";
 import { CountryModule } from "./modules/country/country.module";
+import { LoadDataOnStartService } from "./services/load-data-on-start.service";
 
 @Module({
   imports: [
     // Config module for environment variables
-    ConfigModule.forRoot(),
-
+    ConfigModule.forRoot({
+      isGlobal: true, 
+    }),
     // HTTP module for API requests
     HttpModule,
 
@@ -47,7 +49,7 @@ import { CountryModule } from "./modules/country/country.module";
       entities: [Payload, User],
       synchronize: true, // Only use in development!
     }),
-
+  
     // Register entities
     TypeOrmModule.forFeature([Payload, User]),
     MongooseModule.forRoot("mongodb://localhost:27017/mahis"),
@@ -74,6 +76,7 @@ import { CountryModule } from "./modules/country/country.module";
     DataSyncService,
     DataSyncScheduler,
     SyncGateway,
+    LoadDataOnStartService
   ],
   // exports: [AuthService, DataSyncService],
 })
