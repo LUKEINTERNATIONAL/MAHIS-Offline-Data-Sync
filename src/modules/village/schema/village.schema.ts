@@ -6,17 +6,14 @@ export type VillageDocument = HydratedDocument<Village>;
 @Schema()
 export class Village {
   @Prop({ required: true, unique: true })
-  id: number;
+  village_id: number;
 
   @Prop({ required: true })
   name: string;
 
   @Prop({ required: true })
   traditional_authority_id: number;
-
-  @Prop({ required: true })
-  village_id: number;
-
+ 
   @Prop({ required: true })
   date_created: Date;
 }

@@ -8,6 +8,8 @@ import { RelationshipService } from "../modules/relationship/relationship.servic
 import { WardService } from "../modules/wards/ward.service";
 import { TestTypeService } from "../modules/testTypes/test-type.service";
 import { TraditionalAuthorityService } from "../modules/traditionalAuthority/traditional-authority.service";
+import { VillageService } from "../modules/village/village.service";
+import { TestResultIndicatorService } from "../modules/testResultIndicator/res-result-indicator.service";
 
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
@@ -20,7 +22,9 @@ export class LoadDataOnStartService implements OnModuleInit {
     private relationshipService: RelationshipService,
     private wardService: WardService,
     private testTypesService: TestTypeService,
-    private traditionalAuthorityService: TraditionalAuthorityService
+    private traditionalAuthorityService: TraditionalAuthorityService,
+    private villageService: VillageService,
+    private testResultIndicatorService: TestResultIndicatorService, // Assuming this service is also needed
   ) {}
 
   async onModuleInit() {
@@ -34,5 +38,8 @@ export class LoadDataOnStartService implements OnModuleInit {
     await this.wardService.loadWards();
     await this.testTypesService.loadTestTypes();
     await this.traditionalAuthorityService.loadTraditionalAuthorities();
+    await this.villageService.loadVillages();
+    await this.testResultIndicatorService.loadIndicators();
+
   }
 }
