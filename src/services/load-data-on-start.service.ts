@@ -6,6 +6,8 @@ import { CountryService } from "../modules/country/country.service";
 import { DrugService } from "../modules/drugs/drug.service";
 import { RelationshipService } from "../modules/relationship/relationship.service";
 import { WardService } from "../modules/wards/ward.service";
+import { TestTypeService } from "../modules/testTypes/test-type.service";
+import { TraditionalAuthorityService } from "../modules/traditionalAuthority/traditional-authority.service";
 
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
@@ -16,7 +18,9 @@ export class LoadDataOnStartService implements OnModuleInit {
     private countryService: CountryService,
     private drugService: DrugService,
     private relationshipService: RelationshipService,
-    private wardService: WardService
+    private wardService: WardService,
+    private testTypesService: TestTypeService,
+    private traditionalAuthorityService: TraditionalAuthorityService
   ) {}
 
   async onModuleInit() {
@@ -28,5 +32,7 @@ export class LoadDataOnStartService implements OnModuleInit {
     await this.drugService.loadDrugs();
     await this.relationshipService.loadRelationships();
     await this.wardService.loadWards();
+    await this.testTypesService.loadTestTypes();
+    await this.traditionalAuthorityService.loadTraditionalAuthorities();
   }
 }

@@ -6,9 +6,6 @@ export type TestTypeDocument = HydratedDocument<TestType>;
 @Schema()
 export class TestType {
   @Prop({ required: true, unique: true })
-  id: number;
-
-  @Prop({ required: true })
   concept_id: number;
 
   @Prop()
