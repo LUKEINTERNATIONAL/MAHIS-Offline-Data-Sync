@@ -6,7 +6,7 @@ export type CountryDocument = HydratedDocument<Country>;
 @Schema()
 export class Country {
   @Prop({ required: true })
-  country_id: number;
+  district_id: number;
 
   @Prop({ required: true })
   name: string;

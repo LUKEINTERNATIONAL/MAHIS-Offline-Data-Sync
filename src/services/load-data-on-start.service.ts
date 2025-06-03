@@ -2,13 +2,15 @@ import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ConceptSetService } from "../modules/conceptSet/concept-set.service";
 import { ConceptNameService } from "../modules/conceptName/concept-name.service";
 import { FacilityService } from "../modules/facilities/facilities.service";
+import { CountryService } from "../modules/country/country.service";
 
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
   constructor(
     private conceptSetService: ConceptSetService,
     private conceptNameService: ConceptNameService,
-    private facilityService: FacilityService, // Assuming you have a FacilityService for loading facility data
+    private facilityService: FacilityService,
+    private countryService: CountryService, 
   ) {}
 
   async onModuleInit() {
@@ -16,5 +18,6 @@ export class LoadDataOnStartService implements OnModuleInit {
     await this.conceptSetService.loadConceptSet();
     await this.conceptNameService.loadConceptNames();
     await this.facilityService.loadFacilities();
+    await this.countryService.loadCountries();
   }
 }
