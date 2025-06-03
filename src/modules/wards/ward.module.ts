@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Ward, WardSchema } from './schema/ward.schema';
 import { WardController } from './ward.controller';
 import { WardService } from './ward.service';
+import { HttpModule } from '@nestjs/axios';
 
 
 
@@ -10,9 +11,10 @@ import { WardService } from './ward.service';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Ward.name, schema: WardSchema }]),
+    HttpModule
   ],
   controllers: [WardController],
   providers: [WardService],
-//   exports: [ConceptNameService], 
+  exports: [WardService], 
 })
 export class WardModule {}
