@@ -130,4 +130,11 @@ export class AppService {
     }
     return patient;
   }
+
+  async testConnection() {
+    return {
+      connection_status: 'available',
+      timestamp: new Date().toISOString()
+    };
+  }
 }
