@@ -12,7 +12,7 @@ import { Specimen } from "./schema/specimen.schema";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("specimens")
-@Controller("api/v1/specimens")
+@Controller("specimens")
 export class SpecimenController {
   constructor(private readonly specimenService: SpecimenService) {}
 

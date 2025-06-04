@@ -5,7 +5,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
 @ApiTags("wards")
-@Controller('api/v1/wards')
+@Controller('wards')
 export class WardController {
   constructor(private readonly wardService: WardService) {}
 

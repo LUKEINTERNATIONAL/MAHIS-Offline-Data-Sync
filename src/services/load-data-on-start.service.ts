@@ -35,7 +35,7 @@ export class LoadDataOnStartService implements OnModuleInit {
 
   async onModuleInit() {
     console.log("Loading concept set data on module initialization...");
-    await this.conceptNameService.loadConceptNames();
+    // await this.conceptNameService.loadConceptNames();
     // await this.conceptSetService.loadConceptSet();
     // await this.facilityService.loadFacilities();
     // await this.countryService.loadCountries();

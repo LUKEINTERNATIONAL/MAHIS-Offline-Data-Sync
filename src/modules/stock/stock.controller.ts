@@ -4,7 +4,7 @@ import { Stock } from './schema/stock.schema';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('stocks')
-@Controller('api/v1/stocks')
+@Controller('stocks')
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

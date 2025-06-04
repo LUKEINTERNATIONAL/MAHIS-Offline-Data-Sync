@@ -6,7 +6,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
 @ApiTags("test type")
-@Controller('api/v1/test-types')
+@Controller('test-types')
 export class TestTypeController {
   constructor(private readonly testTypeService: TestTypeService) {}
 

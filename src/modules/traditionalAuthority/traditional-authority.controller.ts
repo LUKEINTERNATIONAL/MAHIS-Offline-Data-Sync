@@ -6,7 +6,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
 @ApiTags("traditional authorities")
-@Controller('api/v1/traditional-authorities')
+@Controller('traditional-authorities')
 export class TraditionalAuthorityController {
   constructor(private readonly TraditionalAuthorityService: TraditionalAuthorityService) {}
 

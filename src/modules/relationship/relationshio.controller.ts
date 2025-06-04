@@ -6,7 +6,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
 @ApiTags('relationships')
-@Controller('api/v1/relationships')
+@Controller('relationships')
 export class RelationshipController {
   constructor(private readonly relationshipService: RelationshipService) {}
 

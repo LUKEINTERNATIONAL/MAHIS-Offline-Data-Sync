@@ -3,7 +3,7 @@ import { PatientService } from './patient.service';
 import { Patient } from './schema/patient.schema';
 
 
-@Controller('api/v1/patients')
+@Controller('patients')
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
 

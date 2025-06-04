@@ -6,7 +6,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
 @ApiTags("test result indicator")
-@Controller('api/v1/test-result-indicators')
+@Controller('test-result-indicators')
 export class TestResultIndicatorController {
   constructor(private readonly testResultIndicatorService: TestResultIndicatorService) {}
 

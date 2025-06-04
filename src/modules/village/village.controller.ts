@@ -5,7 +5,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
 @ApiTags("villages")
-@Controller('api/v1/villages')
+@Controller('villages')
 export class VillageController {
   constructor(private readonly villageService: VillageService) {}
 

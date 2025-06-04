@@ -12,7 +12,7 @@ import { Program } from "./schema/program.schema";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("programs")
-@Controller("api/v1/programs")
+@Controller("programs")
 export class ProgramController {
   constructor(private readonly programService: ProgramService) {}
 

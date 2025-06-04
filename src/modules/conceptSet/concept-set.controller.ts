@@ -12,7 +12,7 @@ import { ConceptSet } from "./schema/concept-set.schema";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("Concept Sets")
-@Controller("api/v1/concept-sets")
+@Controller("concept-sets")
 export class ConceptSetController {
   constructor(private readonly conceptSetService: ConceptSetService) {}
 

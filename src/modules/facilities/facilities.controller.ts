@@ -12,7 +12,7 @@ import { Facility } from "./schema/facility.schema";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("facilities")
-@Controller("api/v1/facilities")
+@Controller("facilities")
 export class FacilityController {
   constructor(private readonly facilityService: FacilityService) {}
 

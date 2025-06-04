@@ -12,7 +12,7 @@ import { Country } from "./schema/country.schema";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("countries")
-@Controller("api/v1/countries")
+@Controller("countries")
 export class CountryController {
   constructor(private readonly countryService: CountryService) {}
 
