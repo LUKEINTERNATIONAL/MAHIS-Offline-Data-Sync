@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Patient, PatientDocument } from './modules/patient/schema/patient.schema';
+import { PatientService } from './modules/patient/patient.service';
 import { AuthService } from './app.authService';
 import { lastValueFrom } from 'rxjs';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class DataSyncService {
@@ -12,9 +11,8 @@ export class DataSyncService {
 
   constructor(
     private readonly httpService: HttpService,
-    private authService: AuthService,
-    @InjectModel(Patient.name)
-    private patientModel: Model<PatientDocument>,
+    private readonly authService: AuthService,
+    private readonly patientService: PatientService,
   ) {}
 
   /**
@@ -28,7 +26,7 @@ export class DataSyncService {
       }
 
       this.logger.log('Fetching all patient records from database');
-      const allRecords = await this.patientModel.find().exec();
+      const allRecords = await this.patientService.findAll();
       
       if (!allRecords || allRecords.length === 0) {
         this.logger.log('No records found in database to sync');
@@ -36,7 +34,7 @@ export class DataSyncService {
       }
 
       this.logger.log(`Found ${allRecords.length} records to sync`);
-      const saveUrl = `${this.authService.getBaseUrl()}/api/v1/save_patient_record`;
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
       
       const results = {
         total: allRecords.length,
@@ -54,7 +52,7 @@ export class DataSyncService {
               parsedData = JSON.parse(record.data);
             }
           } catch (parseError) {
-            this.logger.warn(`Failed to parse data for record ID ${record._id}: ${parseError.message}`);
+            this.logger.warn(`Failed to parse data for record ID ${record._id.toString()}: ${parseError.message}`);
           }
 
           const syncPayload = {
@@ -75,23 +73,22 @@ export class DataSyncService {
           );
 
           if (responseData) {
-            await this.patientModel.findByIdAndUpdate(
-              record._id,
-              { 
-                data: JSON.stringify(responseData),
-                message: 'Updated from API response'
-              }
-            );
+            // Update using PatientService by MongoDB _id
+            await this.patientService.updateById(record._id.toString(), {
+              data: JSON.stringify(responseData),
+              message: 'Updated from API response',
+              timestamp: Date.now(),
+            });
             
             results.successful++;
             results.updatedRecords.push(record._id);
           }
 
         } catch (syncError) {
-          // this.logger.error(`Error processing record ID ${record._id}: ${syncError.message}`);
+          this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
           results.failed++;
           results.errors.push({
-            recordId: record._id,
+            recordId: record._id.toString(),
             patientID: record.patientID,
             error: syncError.message,
           });
@@ -106,6 +103,101 @@ export class DataSyncService {
       };
     } catch (error) {
       this.logger.error(`Patient record sync failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync specific patient record by patientID
+   */
+  async syncPatientRecord(patientID: string) {
+    try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
+
+      this.logger.log(`Syncing specific patient record: ${patientID}`);
+      const record = await this.patientService.findByPatientId(patientID);
+      
+      if (!record) {
+        this.logger.warn(`Patient record not found: ${patientID}`);
+        return { success: false, message: 'Patient record not found' };
+      }
+
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+      
+      let parsedData: any = {};
+      try {
+        if (record.data) {
+          parsedData = JSON.parse(record.data);
+        }
+      } catch (parseError) {
+        this.logger.warn(`Failed to parse data for patientID ${patientID}: ${parseError.message}`);
+      }
+
+      const syncPayload = {
+        record: {
+          ...parsedData,
+          patientID: record.patientID,
+          timestamp: record.timestamp,
+        }
+      };
+
+      const { data: responseData } = await lastValueFrom(
+        this.httpService.post(saveUrl, syncPayload, {
+          headers: {
+            Authorization: this.authService.getAuthToken(),
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      if (responseData) {
+        // Update using PatientService by patientID
+        await this.patientService.updateByPatientId(patientID, {
+          data: JSON.stringify(responseData),
+          message: 'Updated from API response',
+          timestamp: Date.now(),
+        });
+        
+        this.logger.log(`Successfully synced patient record: ${patientID}`);
+        return {
+          success: true,
+          message: `Successfully synced patient ${patientID}`,
+          patientID,
+          recordId: record._id,
+        };
+      }
+
+      return { success: false, message: 'No response data received' };
+
+    } catch (error) {
+      this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get sync status for all patients
+   */
+  async getSyncStatus() {
+    try {
+      const allRecords = await this.patientService.findAll();
+      
+      const status = {
+        totalRecords: allRecords.length,
+        lastSyncedRecords: allRecords.filter(record => 
+          record.message && record.message.includes('Updated from API response')
+        ).length,
+        pendingSync: allRecords.filter(record => 
+          !record.message || !record.message.includes('Updated from API response')
+        ).length,
+      };
+
+      return status;
+    } catch (error) {
+      this.logger.error(`Failed to get sync status: ${error.message}`);
       throw error;
     }
   }

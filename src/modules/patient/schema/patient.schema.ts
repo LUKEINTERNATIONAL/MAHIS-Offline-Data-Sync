@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Document } from 'mongoose';
+import { Types } from 'mongoose';
 
 export type PatientDocument = HydratedDocument<Patient>;
 
@@ -7,7 +8,9 @@ export type PatientDocument = HydratedDocument<Patient>;
   timestamps: true,
   collection: 'patients'
 })
-export class Patient {
+export class Patient extends Document {
+  _id: Types.ObjectId;
+
   @Prop({ required: true })
   message: string;
 
@@ -17,7 +20,6 @@ export class Patient {
   @Prop({ type: Number })
   timestamp: number;
 
-  // Keep patientID as unique but not the primary key for operations
   @Prop({ 
     required: true,
     unique: true, 
