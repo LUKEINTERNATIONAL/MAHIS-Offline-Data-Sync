@@ -6,9 +6,6 @@ export type DiagnosisDocument = HydratedDocument<Diagnosis>;
 @Schema({ timestamps: false }) // `date_created` is manually managed
 export class Diagnosis {
   @Prop({ required: true, unique: true })
-  id: number;
-
-  @Prop()
   concept_id: number;
 
   @Prop()
