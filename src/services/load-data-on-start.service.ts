@@ -36,9 +36,9 @@ export class LoadDataOnStartService implements OnModuleInit {
     await this.drugService.loadDrugs();
     await this.relationshipService.loadRelationships();
     await this.wardService.loadWards();
-    await this.testTypesService.loadTestTypes();
     await this.traditionalAuthorityService.loadTraditionalAuthorities();
     await this.villageService.loadVillages();
+    await this.testTypesService.loadTestTypes();
     await this.testResultIndicatorService.loadIndicators();
 
   }

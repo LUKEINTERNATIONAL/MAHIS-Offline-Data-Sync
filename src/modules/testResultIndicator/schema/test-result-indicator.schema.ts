@@ -6,9 +6,6 @@ export type TestResultIndicatorDocument = HydratedDocument<TestResultIndicator>;
 @Schema()
 export class TestResultIndicator {
   @Prop({ required: true, unique: true })
-  id: number;
-
-  @Prop({ required: true })
   concept_id: number;
 
   @Prop({ required: true })
