@@ -12,32 +12,32 @@ export class PayloadDto {
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  // constructor(private readonly appService: AppService) {}
 
-  @Get()
-  @Header('Content-Type', 'text/html')
-  async getHome(): Promise<string> {
-    return await this.appService.getHome();
-  }
+  // @Get()
+  // @Header('Content-Type', 'text/html')
+  // async getHome(): Promise<string> {
+  //   return await this.appService.getHome();
+  // }
 
-  @Post('receive-payload')
-  async receivePayload(@Body() payload: PayloadDto | PayloadDto[]) {
-    // Convert single payload to array if needed
-    const payloadArray = Array.isArray(payload) ? payload : [payload];
-    return await this.appService.processPayload(payloadArray);
-  }
+  // @Post('receive-payload')
+  // async receivePayload(@Body() payload: PayloadDto | PayloadDto[]) {
+  //   // Convert single payload to array if needed
+  //   const payloadArray = Array.isArray(payload) ? payload : [payload];
+  //   return await this.appService.processPayload(payloadArray);
+  // }
 
-  @Get('patient-ids')
-  async getAllPatientIds(): Promise<string[]> {
-    return await this.appService.getAllPatientIds();
-  }
+  // @Get('patient-ids')
+  // async getAllPatientIds(): Promise<string[]> {
+  //   return await this.appService.getAllPatientIds();
+  // }
 
-  @Get('patient/:patientId/payload')
-  async getPatientPayload(@Param('patientId') patientId: string) {
-    const payload = await this.appService.getPatientPayload(patientId);
-    if (!payload) {
-      throw new NotFoundException(`Payload not found for patient ID ${patientId}`);
-    }
-    return JSON.parse(payload.data);
-  }
+  // @Get('patient/:patientId/payload')
+  // async getPatientPayload(@Param('patientId') patientId: string) {
+  //   const payload = await this.appService.getPatientPayload(patientId);
+  //   if (!payload) {
+  //     throw new NotFoundException(`Payload not found for patient ID ${patientId}`);
+  //   }
+  //   return JSON.parse(payload.data);
+  // }
 }

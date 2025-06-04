@@ -6,6 +6,7 @@ import * as bodyParser from 'body-parser';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.useGlobalPipes(new ValidationPipe());
+  app.setGlobalPrefix('api/v1')
 
   /* increase JSON limit to 25 MB */
   app.use(bodyParser.json({ limit: '25mb' }));
@@ -14,7 +15,7 @@ async function bootstrap() {
   app.enableCors();
   
   // Listen on all network interfaces
-  const port_number = process.env.PORT || 3009;
+  const port_number = process.env.PORT || 3002;
   process.env.PORT = port_number.toString();
   
   // Try to detect server IP
