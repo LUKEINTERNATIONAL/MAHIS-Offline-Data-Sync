@@ -12,6 +12,7 @@ import { VillageService } from "../modules/village/village.service";
 import { TestResultIndicatorService } from "../modules/testResultIndicator/res-result-indicator.service";
 import { StockService } from "../modules/stock/stock.service";
 import { DiagnosisService } from "../modules/diagnosis/diagnosis.service";
+import { SpecimenService } from "../modules/specimen/specimen.service";
 
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
@@ -28,7 +29,8 @@ export class LoadDataOnStartService implements OnModuleInit {
     private villageService: VillageService,
     private testResultIndicatorService: TestResultIndicatorService,
     private stockService: StockService, 
-    private diagnosisService: DiagnosisService
+    private diagnosisService: DiagnosisService,
+    private specimenService: SpecimenService
   ) {}
 
   async onModuleInit() {
@@ -45,7 +47,8 @@ export class LoadDataOnStartService implements OnModuleInit {
     // await this.testTypesService.loadTestTypes();
     // await this.testResultIndicatorService.loadIndicators();
     // await this.stockService.loadStock();
-    await this.diagnosisService.loadDiagnoses();
+    // await this.diagnosisService.loadDiagnoses();
+    await this.specimenService.loadSpecimen();
 
   }
 }

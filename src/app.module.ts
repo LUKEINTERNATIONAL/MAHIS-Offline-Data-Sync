@@ -30,6 +30,7 @@ import { FacilityModule } from "./modules/facilities/facilities,module";
 import { CountryModule } from "./modules/country/country.module";
 import { LoadDataOnStartService } from "./services/load-data-on-start.service";
 import { VillageModule } from "./modules/village/village.module";
+import { SpecimenModule } from "./modules/specimen/specimen.module";
 
 @Module({
   imports: [
@@ -69,7 +70,8 @@ import { VillageModule } from "./modules/village/village.module";
     TestTypeModule,
     FacilityModule, 
     CountryModule,
-    VillageModule
+    VillageModule,
+    SpecimenModule 
   ],
   controllers: [AppController],
   providers: [
