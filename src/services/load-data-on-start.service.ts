@@ -49,6 +49,5 @@ export class LoadDataOnStartService implements OnModuleInit {
     await this.stockService.loadStock();
     await this.diagnosisService.loadDiagnoses();
     await this.specimenService.loadSpecimen();
-
   }
 }
