@@ -35,20 +35,20 @@ export class LoadDataOnStartService implements OnModuleInit {
 
   async onModuleInit() {
     console.log("Loading concept set data on module initialization...");
-    await this.conceptSetService.loadConceptSet();
     await this.conceptNameService.loadConceptNames();
-    await this.facilityService.loadFacilities();
-    await this.countryService.loadCountries();
-    await this.drugService.loadDrugs();
-    await this.relationshipService.loadRelationships();
-    await this.wardService.loadWards();
-    await this.traditionalAuthorityService.loadTraditionalAuthorities();
-    await this.villageService.loadVillages();
-    await this.testTypesService.loadTestTypes();
-    await this.testResultIndicatorService.loadIndicators();
-    await this.stockService.loadStock();
-    await this.diagnosisService.loadDiagnoses();
-    await this.specimenService.loadSpecimen();
+    // await this.conceptSetService.loadConceptSet();
+    // await this.facilityService.loadFacilities();
+    // await this.countryService.loadCountries();
+    // await this.drugService.loadDrugs();
+    // await this.relationshipService.loadRelationships();
+    // await this.wardService.loadWards();
+    // await this.traditionalAuthorityService.loadTraditionalAuthorities();
+    // await this.villageService.loadVillages();
+    // await this.testTypesService.loadTestTypes();
+    // await this.testResultIndicatorService.loadIndicators();
+    // await this.stockService.loadStock();
+    // await this.diagnosisService.loadDiagnoses();
+    // await this.specimenService.loadSpecimen();
 
   }
 }
