@@ -6,12 +6,14 @@ import { PayloadDto } from './app.controller';
 import { generateQRCodeDataURL } from './utils/qrcode.util';
 import { getAPIHomePage } from './utils/htmlStr/html_responses';
 import { sophisticatedMergePatientData } from './utils/patient_record_utils';
+import { SyncGateway } from './websocket/gateways/sync.gateway';
 
 @Injectable()
 export class AppService {
   constructor(
     @InjectModel(Patient.name)
     private readonly patientModel: Model<PatientDocument>,
+     private readonly syncGateway: SyncGateway,
   ) {}
 
   async getHome(): Promise<string> {
@@ -69,6 +71,9 @@ export class AppService {
               },
               { new: true }
             );
+
+            // Trigger WebSocket broadcast
+            this.syncGateway.broadcastPatientUpdate(updatedPatient.patientID);
 
             results.push({
               success: true,
