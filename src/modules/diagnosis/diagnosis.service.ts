@@ -5,6 +5,7 @@ import { Diagnosis, DiagnosisDocument } from "./schema/diagnosis.schema";
 import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class DiagnosisService {
@@ -12,7 +13,8 @@ export class DiagnosisService {
     @InjectModel(Diagnosis.name)
     private diagnosisModel: Model<DiagnosisDocument>,
     private configService: ConfigService,
-    private httpService: HttpService
+    private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Diagnosis>): Promise<Diagnosis> {
@@ -46,15 +48,8 @@ export class DiagnosisService {
 
   async loadDiagnoses(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken();
 
       // Fetch diagnoses
       const diagnosesResponse$ = this.httpService.get(

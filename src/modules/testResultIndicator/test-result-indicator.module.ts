@@ -5,12 +5,14 @@ import { TestResultIndicatorController } from './res-result-indicator.controller
 import { TestResultIndicatorService } from './res-result-indicator.service';
 import { TestTypeModule } from '../testTypes/test-type.module';
 import { HttpModule } from '@nestjs/axios';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: TestResultIndicator.name, schema: TestResultIndicatorSchema }]),
-    TestTypeModule, HttpModule
+    TestTypeModule, HttpModule,
+    AuthModule
   ],
 
   controllers: [TestResultIndicatorController],

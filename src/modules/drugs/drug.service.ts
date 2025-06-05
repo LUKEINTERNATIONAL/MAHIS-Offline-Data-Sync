@@ -5,6 +5,7 @@ import { Drug, DrugDocument } from './schema/drug.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class DrugService {
@@ -13,6 +14,7 @@ export class DrugService {
     private readonly drugModel: Model<DrugDocument>,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Drug>): Promise<Drug> {
@@ -41,15 +43,10 @@ export class DrugService {
 
   async loadDrugs(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
+      const apiUrl = this.authService.getBaseUrl()
 
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+    
+      const token = this.authService.getAuthToken()
 
       // Fetch all drugs without pagination
       const drugsResponse$ = this.httpService.get(`${apiUrl}/drugs?paginate=false`, {

@@ -24,12 +24,13 @@ import { StockModule } from "./modules/stock/stock.module";
 import { Village } from "./modules/village/schema/village.schema";
 import { ProgramModule } from "./modules/programs/program.module";
 import { TestTypeModule } from "./modules/testTypes/test-type.module";
-import { FacilityModule } from "./modules/facilities/facilities,module";
+import { FacilityModule } from "./modules/facilities/facilities.module";
 import { CountryModule } from "./modules/country/country.module";
 import { LoadDataOnStartService } from "./services/load-data-on-start.service";
 import { VillageModule } from "./modules/village/village.module";
 import { SpecimenModule } from "./modules/specimen/specimen.module";
 import { UserModule } from './modules/user/user.module';
+import { AuthModule } from "./modules/auth/auth.module";
 
 @Module({
   imports: [
@@ -44,7 +45,7 @@ import { UserModule } from './modules/user/user.module';
     ScheduleModule.forRoot(),
 
     // Database configuration
-    MongooseModule.forRoot("mongodb://localhost:27017/mahis"),
+    MongooseModule.forRoot("mongodb://localhost:27017/test"),
   
     // Register entities
     PatientModule,
@@ -65,6 +66,7 @@ import { UserModule } from './modules/user/user.module';
     VillageModule,
     SpecimenModule,
     UserModule, 
+    AuthModule
   ],
   controllers: [AppController],
   providers: [

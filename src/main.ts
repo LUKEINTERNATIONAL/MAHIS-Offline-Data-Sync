@@ -15,7 +15,7 @@ import { TestTypeModule } from "./modules/testTypes/test-type.module";
 import { TestResultIndicatorModule } from "./modules/testResultIndicator/test-result-indicator.module";
 import { StockModule } from "./modules/stock/stock.module";
 import { RelationshipModule } from "./modules/relationship/relationship.module";
-import { FacilityModule } from "./modules/facilities/facilities,module";
+import { FacilityModule } from "./modules/facilities/facilities.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });

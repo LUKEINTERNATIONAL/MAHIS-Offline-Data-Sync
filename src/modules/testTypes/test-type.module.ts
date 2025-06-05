@@ -5,12 +5,14 @@ import { TestType, TestTypeSchema } from './schema/test-type.schema';
 import { TestTypeController } from './test-type.controller';
 import { TestTypeService } from './test-type.service';
 import { HttpModule } from '@nestjs/axios';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: TestType.name, schema: TestTypeSchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [TestTypeController],
   providers: [TestTypeService],

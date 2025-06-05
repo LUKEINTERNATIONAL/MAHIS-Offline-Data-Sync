@@ -4,12 +4,14 @@ import { Facility, FacilitySchema } from './schema/facility.schema';
 import { FacilityController } from './facilities.controller';
 import { FacilityService } from './facilities.service';
 import { HttpModule } from '@nestjs/axios';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Facility.name, schema: FacilitySchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [FacilityController],
   providers: [FacilityService],

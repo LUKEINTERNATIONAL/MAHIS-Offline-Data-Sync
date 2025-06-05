@@ -2,9 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { ConceptSet, ConceptSetDocument } from "./schema/concept-set.schema";
-import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class ConceptSetService {
@@ -12,7 +12,7 @@ export class ConceptSetService {
     @InjectModel(ConceptSet.name)
     private conceptSetModel: Model<ConceptSetDocument>,
     private httpService: HttpService,
-    private configService: ConfigService
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<ConceptSet>): Promise<ConceptSet> {
@@ -33,14 +33,8 @@ export class ConceptSetService {
 
   async loadConceptSet(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-
-      const loginResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authResponse = await lastValueFrom(loginResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken()
 
       const conceptSetResponse$ = this.httpService.get(
         `${apiUrl}/concept_sets_ids?paginate=false`,

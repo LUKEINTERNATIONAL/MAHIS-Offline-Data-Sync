@@ -5,12 +5,14 @@ import { Village, VillageSchema } from './schema/village.schema';
 import { VillageController } from './village.controller';
 import { VillageService } from './village.service';
 import { HttpModule } from '@nestjs/axios';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Village.name, schema: VillageSchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [VillageController],
   providers: [VillageService],

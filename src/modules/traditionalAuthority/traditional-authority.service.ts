@@ -5,6 +5,7 @@ import { TraditionalAuthority, TraditionalAuthorityDocument } from './schema/tra
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class TraditionalAuthorityService {
@@ -13,6 +14,7 @@ export class TraditionalAuthorityService {
     private traditionalAuthorityModel: Model<TraditionalAuthorityDocument>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<TraditionalAuthority>): Promise<TraditionalAuthority> {
@@ -41,15 +43,8 @@ export class TraditionalAuthorityService {
 
   async loadTraditionalAuthorities(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       // Fetch traditional authorities
       const taResponse$ = this.httpService.get(

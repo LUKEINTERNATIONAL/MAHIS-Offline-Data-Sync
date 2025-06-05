@@ -5,6 +5,7 @@ import { Specimen, SpecimenDocument } from "./schema/specimen.schema";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class SpecimenService {
@@ -12,7 +13,8 @@ export class SpecimenService {
     @InjectModel(Specimen.name)
     private specimenModel: Model<SpecimenDocument>,
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Specimen>): Promise<Specimen> {
@@ -33,14 +35,8 @@ export class SpecimenService {
 
   async loadSpecimens(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-
-      const authRes$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authRes = await lastValueFrom(authRes$);
-      const token = authRes.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       const specimenRes$ = this.httpService.get(`${apiUrl}/lab/specimen_types?paginate=false`, {
         headers: {

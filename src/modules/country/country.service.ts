@@ -5,6 +5,7 @@ import { Country, CountryDocument } from './schema/country.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class CountryService {
@@ -13,6 +14,7 @@ export class CountryService {
     private countryModel: Model<CountryDocument>,
     private configService: ConfigService,
     private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Country>): Promise<Country> {
@@ -37,16 +39,8 @@ export class CountryService {
 
   async loadCountries(): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
-  
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
-  
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken()
       const headers = {
         Authorization: token,
       };

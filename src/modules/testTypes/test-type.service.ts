@@ -5,6 +5,7 @@ import { TestType, TestTypeDocument } from "./schema/test-type.schema";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class TestTypeService {
@@ -12,7 +13,8 @@ export class TestTypeService {
     @InjectModel(TestType.name)
     private testTypeModel: Model<TestTypeDocument>,
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<TestType>): Promise<TestType> {
@@ -33,15 +35,8 @@ export class TestTypeService {
 
   async loadTestTypes(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       // Fetch test types
       const testTypesResponse$ = this.httpService.get(`${apiUrl}/get_test_types?paginate=false`, {

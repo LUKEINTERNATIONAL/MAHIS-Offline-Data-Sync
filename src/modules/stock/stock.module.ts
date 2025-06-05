@@ -4,12 +4,14 @@ import { Stock, StockSchema } from './schema/stock.schema';
 import { HttpModule } from '@nestjs/axios';
 import { StockController } from './stock.controller';
 import { StockService } from './stock.service';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Stock.name, schema: StockSchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [StockController],
   providers: [StockService],

@@ -5,6 +5,7 @@ import { Facility, FacilityDocument } from './schema/facility.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class FacilityService {
@@ -13,6 +14,7 @@ export class FacilityService {
     private facilityModel: Model<FacilityDocument>,
     private configService: ConfigService,
     private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Facility>): Promise<Facility> {
@@ -41,15 +43,8 @@ export class FacilityService {
 
   async loadFacilities(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       // Fetch facilities
       const facilitiesResponse$ = this.httpService.get(

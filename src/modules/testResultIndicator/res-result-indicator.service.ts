@@ -9,6 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import { lastValueFrom } from "rxjs";
 import { TestTypeService } from "../testTypes/test-type.service";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class TestResultIndicatorService {
@@ -17,7 +18,8 @@ export class TestResultIndicatorService {
     private testResultIndicatorModel: Model<TestResultIndicatorDocument>,
     private configService: ConfigService,
     private httpService: HttpService,
-    private testTypeService: TestTypeService
+    private testTypeService: TestTypeService,
+    private authService: AuthService
   ) {}
 
   async create(
@@ -49,14 +51,8 @@ export class TestResultIndicatorService {
 
   async loadIndicators(): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-
-      const authRes$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authRes = await lastValueFrom(authRes$);
-      const token = authRes.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       const testTypes = await this.testTypeService.findAll();
 

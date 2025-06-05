@@ -4,12 +4,14 @@ import { Specimen, specimenSchema } from './schema/specimen.schema';
 import { HttpModule } from '@nestjs/axios';
 import { SpecimenController } from './specimen.controller';
 import { SpecimenService } from './specimen.service';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Specimen.name, schema: specimenSchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [SpecimenController],
   providers: [SpecimenService],

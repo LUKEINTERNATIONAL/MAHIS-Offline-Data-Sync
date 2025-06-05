@@ -5,6 +5,7 @@ import { Relationship, RelationshipDocument } from './schema/relationship.schema
 import { lastValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class RelationshipService {
@@ -12,7 +13,8 @@ export class RelationshipService {
     @InjectModel(Relationship.name)
     private readonly relationshipModel: Model<RelationshipDocument>,
     private readonly configService: ConfigService,
-    private readonly httpService: HttpService
+    private readonly httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Relationship>): Promise<Relationship> {
@@ -42,15 +44,9 @@ export class RelationshipService {
 
   async loadRelationships(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
+      const apiUrl = this.authService.getBaseUrl()
 
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const token = this.authService.getAuthToken()
 
       // Fetch relationships without pagination
       const relationshipsResponse$ = this.httpService.get(`${apiUrl}/types/relationships?paginate=false`, {

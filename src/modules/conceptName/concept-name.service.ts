@@ -8,6 +8,8 @@ import {
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
+
 
 @Injectable()
 export class ConceptNameService {
@@ -15,7 +17,8 @@ export class ConceptNameService {
     @InjectModel(ConceptName.name)
     private conceptNameModel: Model<ConceptNameDocument>,
     private httpService: HttpService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(conceptName: Partial<ConceptName>): Promise<ConceptName> {
@@ -35,14 +38,14 @@ export class ConceptNameService {
   }
   async loadConceptNames(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
 
-      const response$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authResponse = await lastValueFrom(response$);
-      const token = authResponse.data.authorization.token;
+      const totalDocuments = await this.count();
+      if (totalDocuments == count) {
+        console.log("no new concepts have been added since the last sync");
+        return;
+      }
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken();
 
       const conceptResponse$ = this.httpService.get(
         `${apiUrl}/concept_names?paginate=false`,
@@ -55,12 +58,7 @@ export class ConceptNameService {
       const conceptResponse = await lastValueFrom(conceptResponse$);
       const conceptNames = conceptResponse.data;
 
-      const totalDocuments = await this.count();
-
-      if (totalDocuments == count) {
-        console.log("no new concepts have been added since the last sync");
-        return;
-      }
+  
 
       // Step 1: Clear the collection
       await this.conceptNameModel.deleteMany({});

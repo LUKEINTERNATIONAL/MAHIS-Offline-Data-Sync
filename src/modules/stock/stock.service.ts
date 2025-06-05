@@ -5,6 +5,7 @@ import { Stock, StockDocument } from "./schema/stock.schema";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class StockService {
@@ -12,7 +13,8 @@ export class StockService {
     @InjectModel(Stock.name)
     private stockModel: Model<StockDocument>,
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Stock>): Promise<Stock> {
@@ -33,14 +35,9 @@ export class StockService {
 
   async loadStock(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
+      const apiUrl = this.authService.getBaseUrl()
 
-      const authRes$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authRes = await lastValueFrom(authRes$);
-      const token = authRes.data.authorization.token;
+      const token = this.authService.getAuthToken()
 
       const stockRes$ = this.httpService.get(`${apiUrl}/pharmacy/items?paginate=false`, {
         headers: {

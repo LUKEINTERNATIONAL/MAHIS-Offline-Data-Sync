@@ -16,6 +16,7 @@ import { SpecimenService } from "../modules/specimen/specimen.service";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../modules/auth/auth.service";
 
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
@@ -35,17 +36,14 @@ export class LoadDataOnStartService implements OnModuleInit {
     private diagnosisService: DiagnosisService,
     private specimenService: SpecimenService,
     private httpService: HttpService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async onModuleInit() {
-    const apiUrl = this.configService.get<string>("API_BASE_URL");
-    const response$ = this.httpService.post(`${apiUrl}/auth/login`, {
-      username: this.configService.get<string>("API_USERNAME"),
-      password: this.configService.get<string>("API_PASSWORD"),
-    });
-    const authResponse = await lastValueFrom(response$);
-    const token = authResponse.data.authorization.token;
+    await this.authService.initialize()
+    const apiUrl = this.authService.getBaseUrl();
+    const token =  this.authService.getAuthToken();
 
     const totalsResponse$ = await this.httpService.get(
       `${apiUrl}/totals?paginate=false`, {headers:{
@@ -53,8 +51,6 @@ export class LoadDataOnStartService implements OnModuleInit {
       }}
     );
     const totalsResponse = await lastValueFrom(totalsResponse$);
-
-    console.log("Loading concept set data on module initialization...");
     await this.conceptNameService.loadConceptNames(totalsResponse.data.total_concept_names);
     await this.conceptSetService.loadConceptSet(totalsResponse.data.total_concept_set);
   

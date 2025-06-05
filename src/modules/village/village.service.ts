@@ -5,6 +5,7 @@ import { Village, VillageDocument } from './schema/village.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class VillageService {
@@ -13,6 +14,7 @@ export class VillageService {
     private villageModel: Model<VillageDocument>,
     private configService: ConfigService,
     private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Village>): Promise<Village> {
@@ -41,15 +43,8 @@ export class VillageService {
 
   async loadVillages(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       // Fetch villages
       const villagesResponse$ = this.httpService.get(

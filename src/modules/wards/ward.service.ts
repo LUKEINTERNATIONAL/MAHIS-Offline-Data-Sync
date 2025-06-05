@@ -6,6 +6,7 @@ import { lastValueFrom } from 'rxjs';
 import { Ward, WardDocument } from './schema/ward.schema';
 import { Model } from 'mongoose';
 import { clear } from 'console';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class WardService {
@@ -14,6 +15,7 @@ export class WardService {
     private wardModel: Model<WardDocument>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Ward>): Promise<Ward> {
@@ -42,15 +44,8 @@ export class WardService {
 
   async loadWards(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
       // Fetch wards with filter tag "Facility adult sections"
       const wardsResponse$ = this.httpService.get(
