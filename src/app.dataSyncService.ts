@@ -74,18 +74,14 @@ export class DataSyncService {
 
           if (responseData) {
             // Update using PatientService by MongoDB _id
-            await this.patientService.updateById(record._id.toString(), {
-              data: JSON.stringify(responseData),
-              message: 'Updated from API response',
-              timestamp: Date.now(),
-            });
+            await this.patientService.updateByPatientId(record.patientID, parsedData);
             
             results.successful++;
             results.updatedRecords.push(record._id);
           }
 
         } catch (syncError) {
-          this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
+          // this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
           results.failed++;
           results.errors.push({
             recordId: record._id.toString(),

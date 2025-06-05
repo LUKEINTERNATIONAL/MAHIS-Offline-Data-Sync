@@ -54,7 +54,7 @@ export class LoadDataOnStartService implements OnModuleInit {
           );
 
           await this.conceptNameService.loadConceptNames(responseData.total_concept_names);
-          await this.conceptSetService.loadConceptSet(responseData.total_concept_set);
+          // await this.conceptSetService.loadConceptSet(responseData.total_concept_set);
         
           await this.facilityService.loadFacilities(responseData.total_facilities);
           await this.countryService.loadCountries();

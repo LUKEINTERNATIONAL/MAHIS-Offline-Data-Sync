@@ -53,7 +53,7 @@ export class DataSyncScheduler implements OnModuleInit {
     try {
       this.logger.log('Starting scheduled patient record sync');
       // TODO: Uncomment the line below to enable scheduled sync
-      // await this.syncPatientRecords();
+      await this.syncPatientRecords();
     } catch (error) {
       this.logger.error(`Scheduled sync failed: ${error.message}`, error.stack);
     }
@@ -63,10 +63,10 @@ export class DataSyncScheduler implements OnModuleInit {
    * Perform the actual patient record sync operation
    */
   private async syncPatientRecords() {
-    // await this.authService.fetchAndSaveUserData();
+    await this.authService.fetchAndSaveUserData();
     // const result = await this.dataSyncService.syncPatientRecords();
-    // // 	http://localhost:3000/api/v1//patients/6270/get_patient_record
-    // await this.authService.syncPatientIds()
+    // 	http://localhost:3000/api/v1//patients/6270/get_patient_record
+    await this.authService.syncPatientIds()
     
     // this.logger.log(`Sync operation completed: ${result.message}`);
     // // if (result.failed > 0) {

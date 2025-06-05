@@ -276,6 +276,10 @@ export class AuthService {
    */
   private async makePatientSyncRequest(request: SyncRequest): Promise<SyncPatientsResponse | null> {
     try {
+      const isAuthenticated = await this.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
       const syncUrl = `${this.baseUrl}/sync/patients_ids`;
       
       const { data } = await firstValueFrom(
@@ -287,7 +291,7 @@ export class AuthService {
           }
         ).pipe(
           catchError((error: AxiosError) => {
-            this.logger.error(`Sync request failed: ${error.message}`);
+            this.logger.error(`Sync request failed: ${error}`);
             throw error;
           }),
         ),
