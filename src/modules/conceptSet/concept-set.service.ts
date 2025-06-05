@@ -2,20 +2,18 @@ import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { ConceptSet, ConceptSetDocument } from "./schema/concept-set.schema";
-import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
-import { AuthService } from "../../app.authService";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class ConceptSetService {
   constructor(
     @InjectModel(ConceptSet.name)
     private conceptSetModel: Model<ConceptSetDocument>,
-    private configService: ConfigService,
-    private httpService: HttpService
-  ) // private authService: AuthService
-  {}
+    private httpService: HttpService,
+    private authService: AuthService
+  ) {}
 
   async create(data: Partial<ConceptSet>): Promise<ConceptSet> {
     return this.conceptSetModel.create(data);
@@ -29,30 +27,16 @@ export class ConceptSetService {
     return this.conceptSetModel.findOne({ id }).exec();
   }
 
-  async update(
-    id: number,
-    data: Partial<ConceptSet>
-  ): Promise<ConceptSet | null> {
-    return this.conceptSetModel
-      .findOneAndUpdate({ id }, data, { new: true })
-      .exec();
+  async count(): Promise<number> {
+    return this.conceptSetModel.countDocuments().exec();
   }
 
-  async delete(id: number): Promise<ConceptSet | null> {
-    return this.conceptSetModel.findOneAndDelete({ id }).exec();
-  }
-
-  async loadConceptSet() {
+  async loadConceptSet(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-      const response$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authResponse = await lastValueFrom(response$);
-      const token = authResponse.data.authorization.token;
-  
-      const conceptResponse$ = this.httpService.get(
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken()
+
+      const conceptSetResponse$ = this.httpService.get(
         `${apiUrl}/concept_sets_ids?paginate=false`,
         {
           headers: {
@@ -60,28 +44,30 @@ export class ConceptSetService {
           },
         }
       );
-  
-      const response = await lastValueFrom(conceptResponse$);
-      const conceptSets = response.data;
-  
-      for (const conceptSet of conceptSets) {
-        const { id, concept_set_name, member_ids } = conceptSet;
-        await this.conceptSetModel.findOneAndUpdate(
-          { id },
-          {
-            id,
-            concept_set_name,
-            member_ids,
-          },
-          { upsert: true, new: true }
-        );
+
+      const conceptSetResponse = await lastValueFrom(conceptSetResponse$);
+      const conceptSets = conceptSetResponse.data;
+
+      const totalDocuments = await this.count();
+
+      if (totalDocuments === expectedCount) {
+        console.log("No new concept sets have been added since the last sync.");
+        return;
       }
-  
-      return { message: `${conceptSets.length} concept sets loaded.` };
+
+      // Step 1: Clear the collection
+      await this.conceptSetModel.deleteMany({});
+
+      // Step 2: Insert all fetched concept sets
+      if (conceptSets.length > 0) {
+        await this.conceptSetModel.insertMany(conceptSets);
+        console.log(`${conceptSets.length} concept sets loaded.`);
+      } else {
+        console.log("No concept sets found.");
+      }
     } catch (error) {
       console.error("Error loading concept sets:", error?.response?.data || error);
       throw new Error("Failed to load concept sets.");
     }
   }
-  
 }

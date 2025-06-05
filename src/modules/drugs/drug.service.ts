@@ -5,14 +5,16 @@ import { Drug, DrugDocument } from './schema/drug.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class DrugService {
   constructor(
     @InjectModel(Drug.name)
-    private drugModel: Model<DrugDocument>,
+    private readonly drugModel: Model<DrugDocument>,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Drug>): Promise<Drug> {
@@ -24,77 +26,55 @@ export class DrugService {
   }
 
   async findById(id: number): Promise<Drug | null> {
-    return this.drugModel.findOne({ id }).exec();
+    return this.drugModel.findOne({ drug_id: id }).exec();
+  }
+
+  async count(): Promise<number> {
+    return this.drugModel.countDocuments().exec();
   }
 
   async update(id: number, data: Partial<Drug>): Promise<Drug | null> {
-    return this.drugModel.findOneAndUpdate({ id }, data, { new: true }).exec();
+    return this.drugModel.findOneAndUpdate({ drug_id: id }, data, { new: true }).exec();
   }
 
   async delete(id: number): Promise<Drug | null> {
-    return this.drugModel.findOneAndDelete({ id }).exec();
+    return this.drugModel.findOneAndDelete({ drug_id: id }).exec();
   }
 
-  async loadDrugs(): Promise<void> {
+  async loadDrugs(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
-  
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
+      const apiUrl = this.authService.getBaseUrl()
+
+    
+      const token = this.authService.getAuthToken()
+
+      // Fetch all drugs without pagination
+      const drugsResponse$ = this.httpService.get(`${apiUrl}/drugs?paginate=false`, {
+        headers: { Authorization: token },
       });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
-  
-      // Fetch drug data
-      const drugsResponse$ = this.httpService.get(
-        `${apiUrl}/drugs?paginate=false`,
-        {
-          headers: {
-            Authorization: token,
-          },
-        }
-      );
       const drugsResponse = await lastValueFrom(drugsResponse$);
       const drugs = drugsResponse.data;
-  
-      // Filter out entries with missing drug_id AND ensure id is not null
-      const validDrugs = drugs.filter(
-        (drug) => drug.drug_id !== null && drug.drug_id !== undefined && drug.id !== null
-      );
-  
-      const skipped = drugs.length - validDrugs.length;
-      if (skipped > 0) {
-        console.warn(`Skipped ${skipped} drugs with missing drug_id or null id`);
+
+      // Check if data is already up-to-date
+      const totalInDb = await this.count();
+      if (expectedCount && totalInDb === expectedCount) {
+        console.log('Drugs already up to date.');
+        return;
       }
-  
-      // Bulk upsert drugs using drug_id as the unique identifier
-      const bulkOps = validDrugs.map((drug) => {
-        // Ensure we're not passing null id
-        const updateData = { ...drug };
-        if (updateData.id === null) {
-          delete updateData.id;
-        }
-        
-        return {
-          updateOne: {
-            filter: { drug_id: drug.drug_id },
-            update: { $set: updateData },
-            upsert: true,
-          },
-        };
-      });
-  
-      if (bulkOps.length > 0) {
-        await this.drugModel.bulkWrite(bulkOps);
-        console.log(`${bulkOps.length} drugs loaded.`);
+
+      // Step 1: Clear existing drugs collection
+      await this.drugModel.deleteMany({});
+
+      // Step 2: Bulk insert fetched drugs
+      if (drugs.length > 0) {
+        await this.drugModel.insertMany(drugs);
+        console.log(`${drugs.length} drugs loaded.`);
       } else {
-        console.log('No valid drugs found to load.');
+        console.log('No drugs found.');
       }
     } catch (error) {
       console.error('Failed to load drugs:', error?.response?.data || error);
-      throw new Error('Could not load drugs');
+      throw new Error('Could not load drugs.');
     }
   }
 }

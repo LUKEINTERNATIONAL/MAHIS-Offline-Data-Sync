@@ -302,7 +302,7 @@ export class AuthService {
     }
   }
 
-    private async updatePayload(patient: any): Promise<void> {
+  private async updatePayload(patient: any): Promise<void> {
       try {
         if (!patient.patientID) {
           throw new Error('Patient ID is required');

@@ -5,6 +5,7 @@ import { Facility, FacilityDocument } from './schema/facility.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class FacilityService {
@@ -12,7 +13,8 @@ export class FacilityService {
     @InjectModel(Facility.name)
     private facilityModel: Model<FacilityDocument>,
     private configService: ConfigService,
-    private httpService: HttpService
+    private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Facility>): Promise<Facility> {
@@ -35,41 +37,43 @@ export class FacilityService {
     return this.facilityModel.findOneAndDelete({ id }).exec();
   }
 
-  async loadFacilities(): Promise<void> {
+  async count(): Promise<number> {
+    return this.facilityModel.countDocuments().exec();
+  }
+
+  async loadFacilities(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
-    
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
-
-     
+      // Fetch facilities
       const facilitiesResponse$ = this.httpService.get(
         `${apiUrl}/facilities?paginate=false`,
         {
-          headers: {
-            Authorization: token,
-          },
-        }
+          headers: { Authorization: token },
+        },
       );
       const facilitiesResponse = await lastValueFrom(facilitiesResponse$);
-      const facilities = facilitiesResponse.data.facilities;
+      const facilities = facilitiesResponse.data.facilities || facilitiesResponse.data;
 
-     
-      for (const facility of facilities) {
-        const { id, ...rest } = facility;
-        await this.facilityModel.findOneAndUpdate(
-          { id },
-          { id, ...rest },
-          { upsert: true, new: true }
-        );
+      // Check current count
+      const totalDocuments = await this.count();
+
+      if (totalDocuments === count) {
+        console.log('No new facilities have been added since the last sync');
+        return;
       }
 
-      console.log(`${facilities.length} facilities loaded.`);
+      // Clear collection
+      await this.facilityModel.deleteMany({});
+
+      // Bulk insert
+      if (facilities.length > 0) {
+        await this.facilityModel.insertMany(facilities);
+        console.log(`${facilities.length} facilities loaded.`);
+      } else {
+        console.log('No facilities found.');
+      }
     } catch (error) {
       console.error('Error loading facilities:', error?.response?.data || error);
       throw new Error('Failed to load facilities.');

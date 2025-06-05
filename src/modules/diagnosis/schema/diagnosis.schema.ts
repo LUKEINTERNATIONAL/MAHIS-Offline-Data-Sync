@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { setToJSON } from '../../../utils/db/mongo';
 
 export type DiagnosisDocument = HydratedDocument<Diagnosis>;
 
@@ -46,3 +47,4 @@ export class Diagnosis {
 }
 
 export const DiagnosisSchema = SchemaFactory.createForClass(Diagnosis);
+setToJSON(DiagnosisSchema)

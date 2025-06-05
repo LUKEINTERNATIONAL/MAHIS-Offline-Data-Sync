@@ -1,34 +1,45 @@
-import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
-import { SpecimenService } from './specimen.service';
-import { Specimen } from './schema/specimen.schema';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  Put,
+  Delete,
+} from "@nestjs/common";
+import { SpecimenService } from "./specimen.service";
+import { Specimen } from "./schema/specimen.schema";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
-
-@Controller('api/v1/specimens')
+@ApiTags("specimens")
+@Controller("specimens")
 export class SpecimenController {
   constructor(private readonly specimenService: SpecimenService) {}
 
-  @Post()
-  async create(@Body() body: Partial<Specimen>) {
-    return this.specimenService.create(body);
-  }
+  // @Post()
+  // async create(@Body() body: Partial<Specimen>) {
+  //   return this.specimenService.create(body);
+  // }
 
   @Get()
+  @ApiOperation({ summary: "get all specimens" })
+  @ApiResponse({ status: 200, description: "List all specimens" })
   async findAll() {
     return this.specimenService.findAll();
   }
 
-  @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.specimenService.findById(Number(id));
-  }
+  // @Get(':id')
+  // async findById(@Param('id') id: string) {
+  //   return this.specimenService.findById(Number(id));
+  // }
 
-  @Put(':id')
-  async update(@Param('id') id: string, @Body() body: Partial<Specimen>) {
-    return this.specimenService.update(Number(id), body);
-  }
+  // @Put(':id')
+  // async update(@Param('id') id: string, @Body() body: Partial<Specimen>) {
+  //   return this.specimenService.update(Number(id), body);
+  // }
 
-  @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.specimenService.delete(Number(id));
-  }
+  // @Delete(':id')
+  // async delete(@Param('id') id: string) {
+  //   return this.specimenService.delete(Number(id));
+  // }
 }

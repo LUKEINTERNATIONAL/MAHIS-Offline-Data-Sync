@@ -5,6 +5,7 @@ import { Diagnosis, DiagnosisDocument } from "./schema/diagnosis.schema";
 import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import { lastValueFrom } from "rxjs";
+import { AuthService } from "../auth/auth.service";
 
 @Injectable()
 export class DiagnosisService {
@@ -12,7 +13,8 @@ export class DiagnosisService {
     @InjectModel(Diagnosis.name)
     private diagnosisModel: Model<DiagnosisDocument>,
     private configService: ConfigService,
-    private httpService: HttpService
+    private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Diagnosis>): Promise<Diagnosis> {
@@ -25,6 +27,10 @@ export class DiagnosisService {
 
   async findById(id: number): Promise<Diagnosis | null> {
     return this.diagnosisModel.findOne({ id }).exec();
+  }
+
+  async count(): Promise<number> {
+    return this.diagnosisModel.countDocuments().exec();
   }
 
   async update(
@@ -40,17 +46,10 @@ export class DiagnosisService {
     return this.diagnosisModel.findOneAndDelete({ id }).exec();
   }
 
-  async loadDiagnoses(): Promise<void> {
+  async loadDiagnoses(expectedCount?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>("API_BASE_URL");
-
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>("API_USERNAME"),
-        password: this.configService.get<string>("API_PASSWORD"),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken();
 
       // Fetch diagnoses
       const diagnosesResponse$ = this.httpService.get(
@@ -59,25 +58,28 @@ export class DiagnosisService {
           headers: {
             Authorization: token,
           },
-          data: {
-            id: 7409,
-          },
         }
       );
       const diagnosesResponse = await lastValueFrom(diagnosesResponse$);
       const diagnoses = diagnosesResponse.data;
 
-      for (const diagnosis of diagnoses) {
-        const { concept_id, ...rest } = diagnosis;
+      const totalDocuments = await this.count();
 
-        await this.diagnosisModel.findOneAndUpdate(
-          { concept_id },
-          { concept_id, ...rest },
-          { upsert: true, new: true }
-        );
+      if (expectedCount && totalDocuments === expectedCount) {
+        console.log("No new diagnoses to update.");
+        return;
       }
 
-      console.log(`${diagnoses.length} diagnoses loaded.`);
+      // Clear existing
+      await this.diagnosisModel.deleteMany({});
+
+      // Bulk insert
+      if (diagnoses.length > 0) {
+        await this.diagnosisModel.insertMany(diagnoses);
+        console.log(`${diagnoses.length} diagnoses loaded.`);
+      } else {
+        console.log("No diagnoses found.");
+      }
     } catch (error) {
       console.error("Error loading diagnoses:", error?.response?.data || error);
       throw new Error("Failed to load diagnoses.");

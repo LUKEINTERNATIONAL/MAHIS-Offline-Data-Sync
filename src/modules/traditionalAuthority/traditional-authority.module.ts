@@ -5,12 +5,14 @@ import { TraditionalAuthority, TraditionalAuthoritySchema } from './schema/tradi
 import { HttpModule } from '@nestjs/axios';
 import { TraditionalAuthorityController } from './traditional-authority.controller';
 import { TraditionalAuthorityService } from './traditional-authority.service';
+import { AuthModule } from '../auth/auth.module';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: TraditionalAuthority.name, schema: TraditionalAuthoritySchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [TraditionalAuthorityController],
   providers: [TraditionalAuthorityService],

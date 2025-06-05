@@ -5,6 +5,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { lastValueFrom } from 'rxjs';
 import { Ward, WardDocument } from './schema/ward.schema';
 import { Model } from 'mongoose';
+import { clear } from 'console';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class WardService {
@@ -13,6 +15,7 @@ export class WardService {
     private wardModel: Model<WardDocument>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Ward>): Promise<Ward> {
@@ -23,31 +26,28 @@ export class WardService {
     return this.wardModel.find().exec();
   }
 
-  async findById(id: number): Promise<Ward | null> {
-    return this.wardModel.findOne({ id }).exec();
+  async findById(location_id: number): Promise<Ward | null> {
+    return this.wardModel.findOne({ location_id }).exec();
   }
 
-  async update(id: number, data: Partial<Ward>): Promise<Ward | null> {
-    return this.wardModel.findOneAndUpdate({ id }, data, { new: true }).exec();
+  async update(location_id: number, data: Partial<Ward>): Promise<Ward | null> {
+    return this.wardModel.findOneAndUpdate({ location_id }, data, { new: true }).exec();
   }
 
-  async delete(id: number): Promise<Ward | null> {
-    return this.wardModel.findOneAndDelete({ id }).exec();
+  async delete(location_id: number): Promise<Ward | null> {
+    return this.wardModel.findOneAndDelete({ location_id }).exec();
   }
 
-  async loadWards(): Promise<void> {
+  async count(): Promise<number> {
+    return this.wardModel.countDocuments().exec();
+  }
+
+  async loadWards(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
-
-      // Fetch ward data
+      // Fetch wards with filter tag "Facility adult sections"
       const wardsResponse$ = this.httpService.get(
         `${apiUrl}/locations?name=&tag=Facility adult sections&paginate=false`,
         {
@@ -59,22 +59,22 @@ export class WardService {
       const wardsResponse = await lastValueFrom(wardsResponse$);
       const wards = wardsResponse.data;
 
-      // Bulk upsert
-      const bulkOps = wards.map(({ location_id, ...rest }) => ({
-        updateOne: {
-          filter: { location_id },
-          update: { $set: { location_id, ...rest } },
-          upsert: true,
-        },
-      }));
+      const totalDocuments = await this.count();
 
-      if (bulkOps.length > 0) {
-        await this.wardModel.bulkWrite(bulkOps);
-        console.log(`${bulkOps.length} wards loaded.`);
-      } else {
-        console.log('No wards found to load.');
+      if (totalDocuments === count) {
+        console.log('No new wards have been added since the last sync');
+        return;
       }
 
+      // Clear existing wards
+      await this.wardModel.deleteMany({});
+
+      if (wards.length > 0) {
+        await this.wardModel.insertMany(wards);
+        console.log(`${wards.length} wards loaded.`);
+      } else {
+        console.log('No wards found.');
+      }
     } catch (error) {
       console.error('Failed to load wards:', error?.response?.data || error);
       throw new Error('Could not load wards');

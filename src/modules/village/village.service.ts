@@ -5,6 +5,7 @@ import { Village, VillageDocument } from './schema/village.schema';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class VillageService {
@@ -13,6 +14,7 @@ export class VillageService {
     private villageModel: Model<VillageDocument>,
     private configService: ConfigService,
     private httpService: HttpService,
+    private authService: AuthService
   ) {}
 
   async create(data: Partial<Village>): Promise<Village> {
@@ -23,31 +25,28 @@ export class VillageService {
     return this.villageModel.find().exec();
   }
 
-  async findById(id: number): Promise<Village | null> {
-    return this.villageModel.findOne({ id }).exec();
+  async findById(village_id: number): Promise<Village | null> {
+    return this.villageModel.findOne({ village_id }).exec();
   }
 
-  async update(id: number, data: Partial<Village>): Promise<Village | null> {
-    return this.villageModel.findOneAndUpdate({ id }, data, { new: true }).exec();
+  async update(village_id: number, data: Partial<Village>): Promise<Village | null> {
+    return this.villageModel.findOneAndUpdate({ village_id }, data, { new: true }).exec();
   }
 
-  async delete(id: number): Promise<Village | null> {
-    return this.villageModel.findOneAndDelete({ id }).exec();
+  async delete(village_id: number): Promise<Village | null> {
+    return this.villageModel.findOneAndDelete({ village_id }).exec();
   }
 
-  async loadVillages(): Promise<void> {
+  async count(): Promise<number> {
+    return this.villageModel.countDocuments().exec();
+  }
+
+  async loadVillages(count?: number): Promise<void> {
     try {
-      const apiUrl = this.configService.get<string>('API_BASE_URL');
+      const apiUrl = this.authService.getBaseUrl()
+      const token = this.authService.getAuthToken()
 
-      // Authenticate
-      const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
-        username: this.configService.get<string>('API_USERNAME'),
-        password: this.configService.get<string>('API_PASSWORD'),
-      });
-      const authResponse = await lastValueFrom(authResponse$);
-      const token = authResponse.data.authorization.token;
-
-      // Fetch village data
+      // Fetch villages
       const villagesResponse$ = this.httpService.get(
         `${apiUrl}/villages?paginate=false`,
         {
@@ -59,19 +58,22 @@ export class VillageService {
       const villagesResponse = await lastValueFrom(villagesResponse$);
       const villages = villagesResponse.data;
 
-      const bulkOps = villages.map(({ village_id, ...rest }) => ({
-        updateOne: {
-          filter: { village_id },
-          update: { $set: { village_id, ...rest } },
-          upsert: true,
-        },
-      }));
+      const totalDocuments = await this.count();
 
-      if (bulkOps.length > 0) {
-        await this.villageModel.bulkWrite(bulkOps);
-        console.log(`${bulkOps.length} villages loaded.`);
+      if (totalDocuments === count) {
+        console.log('No new villages have been added since the last sync');
+        return;
+      }
+
+      // Clear existing
+      await this.villageModel.deleteMany({});
+
+      // Insert fresh
+      if (villages.length > 0) {
+        await this.villageModel.insertMany(villages);
+        console.log(`${villages.length} villages loaded.`);
       } else {
-        console.log('No villages found to load.');
+        console.log('No villages found.');
       }
     } catch (error) {
       console.error('Failed to load villages:', error?.response?.data || error);
