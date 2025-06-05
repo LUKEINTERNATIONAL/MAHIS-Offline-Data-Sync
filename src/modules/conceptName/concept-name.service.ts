@@ -27,11 +27,13 @@ export class ConceptNameService {
     return this.conceptNameModel.findOne({ conceptName_id: id }).exec();
   }
 
-  async loadConceptNames(): Promise<void> {
+  async count(): Promise<number> {
+    return this.conceptNameModel.countDocuments().exec();
+  }
+  async loadConceptNames(count?:number): Promise<void> {
     try {
       const apiUrl = this.configService.get<string>("API_BASE_URL");
   
-     
       const response$ = this.httpService.post(`${apiUrl}/auth/login`, {
         username: this.configService.get<string>("API_USERNAME"),
         password: this.configService.get<string>("API_PASSWORD"),
@@ -39,7 +41,6 @@ export class ConceptNameService {
       const authResponse = await lastValueFrom(response$);
       const token = authResponse.data.authorization.token;
   
-     
       const conceptResponse$ = this.httpService.get(
         `${apiUrl}/concept_names?paginate=false`,
         {
@@ -50,26 +51,24 @@ export class ConceptNameService {
       );
       const conceptResponse = await lastValueFrom(conceptResponse$);
       const conceptNames = conceptResponse.data;
+
+      console.log({count, total: await this.count()} );
   
-     
-      for (const concept of conceptNames) {
-        const { concept_id, name, concept_name_id} = concept;
+      // Step 1: Clear the collection
+      await this.conceptNameModel.deleteMany({});
   
-        await this.conceptNameModel.findOneAndUpdate(
-          { concept_id },
-          {
-            concept_id,
-            name,
-            concept_name_id
-          },
-          { upsert: true, new: true }
-        );
+      // Step 2: Insert all fetched concept names
+      if (conceptNames.length > 0) {
+        await this.conceptNameModel.insertMany(conceptNames);
+        console.log(`${conceptNames.length} concept names loaded.`);
+      } else {
+        console.log("No concept names found.");
       }
-      console.log(`${conceptNames.length} concept names loaded.`);
     } catch (error) {
       console.error("Error loading concept names:", error?.response?.data || error);
       throw new Error("Failed to load concept names.");
     }
   }
+  
   
 }

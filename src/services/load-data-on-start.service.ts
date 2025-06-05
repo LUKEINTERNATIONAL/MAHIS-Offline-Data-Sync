@@ -13,6 +13,9 @@ import { TestResultIndicatorService } from "../modules/testResultIndicator/res-r
 import { StockService } from "../modules/stock/stock.service";
 import { DiagnosisService } from "../modules/diagnosis/diagnosis.service";
 import { SpecimenService } from "../modules/specimen/specimen.service";
+import { HttpService } from "@nestjs/axios";
+import { ConfigService } from "@nestjs/config";
+import { lastValueFrom } from "rxjs";
 
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
@@ -28,14 +31,34 @@ export class LoadDataOnStartService implements OnModuleInit {
     private traditionalAuthorityService: TraditionalAuthorityService,
     private villageService: VillageService,
     private testResultIndicatorService: TestResultIndicatorService,
-    private stockService: StockService, 
+    private stockService: StockService,
     private diagnosisService: DiagnosisService,
-    private specimenService: SpecimenService
+    private specimenService: SpecimenService,
+    private httpService: HttpService,
+    private configService: ConfigService
   ) {}
 
   async onModuleInit() {
-    console.log("Loading concept set data on module initialization...");
-    // await this.conceptNameService.loadConceptNames();
+    const apiUrl = this.configService.get<string>("API_BASE_URL");
+
+    const response$ = this.httpService.post(`${apiUrl}/auth/login`, {
+      username: this.configService.get<string>("API_USERNAME"),
+      password: this.configService.get<string>("API_PASSWORD"),
+    });
+    const authResponse = await lastValueFrom(response$);
+    const token = authResponse.data.authorization.token;
+
+    const totalsResponse$ = await this.httpService.get(
+      `${apiUrl}/totals?paginate=false`, {headers:{
+        Authorization:token
+      }}
+    );
+    const totalsResponse = await lastValueFrom(totalsResponse$);
+
+
+
+
+    await this.conceptNameService.loadConceptNames(totalsResponse.data.total_concept_names);
     // await this.conceptSetService.loadConceptSet();
     // await this.facilityService.loadFacilities();
     // await this.countryService.loadCountries();
@@ -49,6 +72,5 @@ export class LoadDataOnStartService implements OnModuleInit {
     // await this.stockService.loadStock();
     // await this.diagnosisService.loadDiagnoses();
     // await this.specimenService.loadSpecimen();
-
   }
 }
