@@ -165,174 +165,180 @@ export class AuthService {
       return false;
     }
   }
+}
 
-  /**
-   * Fetch user data and save to database
-   */
-  async fetchAndSaveUserData(): Promise<User | null> {
-    try {
-      await this.ensureAuthenticated();
-      
-      // Get the most recent user
-      const user = await this.userModel.findOne().sort({ id: -1 });
+/**
+ * Fetch user data and save to database
+ */
+async function fetchAndSaveUserData(authService: AuthService, userModel: Model<UserDocument>, httpService: HttpService, logger: Logger): Promise<User | null> {
+  try {
+    await authService.ensureAuthenticated();
+    
+    // Get the most recent user
+    const user = await userModel.findOne().sort({ id: -1 });
 
-      if (!user) {
-        this.logger.error('No user found in the database');
-        return null;
-      }
-
-      const userUrl = `${this.baseUrl}/users/${user.id}`;
-      
-      const { data } = await firstValueFrom(
-        this.httpService.get(userUrl, {
-          headers: { Authorization: `${this.authToken}` }
-        })
-      );
-
-      // Update user with new data
-      const updatedUser = await this.userModel.findOneAndUpdate(
-        { id: user.id },
-        { locationId: data.location_id },
-        { new: true }
-      );
-
-      return updatedUser;
-    } catch (error) {
-      this.logger.error(`Error fetching/saving user data: ${error.message}`);
+    if (!user) {
+      logger.error('No user found in the database');
       return null;
     }
+
+    const userUrl = `${authService.getBaseUrl()}/users/${user.id}`;
+    
+    const { data } = await firstValueFrom(
+      httpService.get(userUrl, {
+        headers: { Authorization: `${authService.getAuthToken()}` }
+      })
+    );
+
+    // Update user with new data
+    const updatedUser = await userModel.findOneAndUpdate(
+      { id: user.id },
+      { locationId: data.location_id },
+      { new: true }
+    );
+
+    return updatedUser;
+  } catch (error) {
+    logger.error(`Error fetching/saving user data: ${error.message}`);
+    return null;
   }
+}
 
-  /**
-   * Synchronize patient IDs from the server
-   */
-  async syncPatientIds(): Promise<boolean> {
-    try {
-      await this.ensureAuthenticated();
+/**
+ * Synchronize patient IDs from the server
+ */
+async function syncPatientIds(authService: AuthService, httpService: HttpService, logger: Logger, patientService: PatientService): Promise<boolean> {
+  try {
+    const isAuthenticated = await authService.ensureAuthenticated();
+    if (!isAuthenticated) {
+      throw new Error('Failed to authenticate');
+    }
 
-      const PAGE_SIZE = 50;
-      let currentPage = 1;
-      let totalPatients = 0;
-      let processedPatients = 0;
+    const PAGE_SIZE = 50;
+    let currentPage = 1;
+    let totalPatients = 0;
+    let processedPatients = 0;
+    
+    // Initial sync request
+    const initialRequest: SyncRequest = {
+      previous_sync_date: "",
+      page: currentPage,
+      page_size: PAGE_SIZE
+    };
+
+    // Make the first request to get total count
+    const firstResponse = await makePatientSyncRequest(initialRequest, authService, httpService, logger);
+
+      // console.log('First response:', firstResponse.sync_patients);
+      firstResponse.sync_patients.forEach((patient) => {
+          // console.log('Patient:', patient.patientID);
+          updatePayload(patient, patientService, logger);
+      })
+
+    if (!firstResponse) return false;
+
+    totalPatients = firstResponse.server_patient_count;
+    processedPatients += firstResponse.sync_patients.length;
+    
+    logger.log(`Total patients to sync: ${totalPatients}`);
+    logger.log(`Processed ${processedPatients} patients`);
+
+    // Continue fetching if there are more patients
+    while (processedPatients < totalPatients) {
+      currentPage++;
       
-      // Initial sync request
-      const initialRequest: SyncRequest = {
+      const request: SyncRequest = {
         previous_sync_date: "",
         page: currentPage,
         page_size: PAGE_SIZE
       };
 
-      // Make the first request to get total count
-      const firstResponse = await this.makePatientSyncRequest(initialRequest);
+      const response = await makePatientSyncRequest(request, authService, httpService, logger);
+      if (!response) return false;
 
-        // console.log('First response:', firstResponse.sync_patients);
-        firstResponse.sync_patients.forEach((patient) => {
-            // console.log('Patient:', patient.patientID);
-            this.updatePayload(patient);
-        })
+      // console.log('First response:', firstResponse.sync_patients);
+      response.sync_patients.forEach((patient) => {
+          // console.log('Patient:', patient.patientID);
+          updatePayload(patient, patientService, logger);
+      })
 
-      if (!firstResponse) return false;
-
-      totalPatients = firstResponse.server_patient_count;
-      processedPatients += firstResponse.sync_patients.length;
-      
-      this.logger.log(`Total patients to sync: ${totalPatients}`);
-      this.logger.log(`Processed ${processedPatients} patients`);
-
-      // Continue fetching if there are more patients
-      while (processedPatients < totalPatients) {
-        currentPage++;
-        
-        const request: SyncRequest = {
-          previous_sync_date: "",
-          page: currentPage,
-          page_size: PAGE_SIZE
-        };
-
-        const response = await this.makePatientSyncRequest(request);
-        if (!response) return false;
-
-        // console.log('First response:', firstResponse.sync_patients);
-        response.sync_patients.forEach((patient) => {
-            // console.log('Patient:', patient.patientID);
-            this.updatePayload(patient);
-        })
-
-        processedPatients += response.sync_patients.length;
-        this.logger.log(`Processed ${processedPatients}/${totalPatients} patients`);
-      }
-
-      this.logger.log('Patient sync completed successfully');
-      return true;
-
-    } catch (error) {
-      // this.logger.error(`Error syncing patient IDs: ${error.message}`);
-      return false;
+      processedPatients += response.sync_patients.length;
+      logger.log(`Processed ${processedPatients}/${totalPatients} patients`);
     }
+
+    logger.log('Patient sync completed successfully');
+    return true;
+
+  } catch (error) {
+    // logger.error(`Error syncing patient IDs: ${error.message}`);
+    return false;
   }
-
-  /**
-   * Make a single patient sync request
-   */
-  private async makePatientSyncRequest(request: SyncRequest): Promise<SyncPatientsResponse | null> {
-    try {
-      const isAuthenticated = await this.ensureAuthenticated();
-      if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
-      }
-      const syncUrl = `${this.baseUrl}/sync/patients_ids`;
-      
-      const { data } = await firstValueFrom(
-        this.httpService.post<SyncPatientsResponse>(
-          syncUrl,
-          request,
-          {
-            headers: { Authorization: `${this.authToken}` }
-          }
-        ).pipe(
-          catchError((error: AxiosError) => {
-            this.logger.error(`Sync request failed: ${error}`);
-            throw error;
-          }),
-        ),
-      );
-
-      return data;
-    } catch (error) {
-      this.logger.error(`Error making sync request: ${error.message}`);
-      return null;
-    }
-  }
-
-  private async updatePayload(patient: any): Promise<void> {
-      try {
-        if (!patient.patientID) {
-          throw new Error('Patient ID is required');
-        }
-
-        // Use upsert to update if exists, create if doesn't exist
-        const result = await this.patientService.upsert(
-          { patientID: patient.patientID.toString() }, // Find by patientID
-          {
-            $set: {
-              timestamp: Date.now(),
-              message: 'Updated/Created payload from API VIA ALL',
-              data: JSON.stringify(patient)
-            },
-            $setOnInsert: {
-              patientID: patient.patientID.toString() // Only set on insert
-            }
-          }
-        );
-        
-        if (result.upsertedCount > 0) {
-          this.logger.log(`Created new patient record for patientID: ${patient.patientID}`);
-        } else {
-          this.logger.log(`Updated existing patient record with patientID: ${patient.patientID}`);
-        }
-      } catch (error) {
-        this.logger.error(`Error updating patient record: ${error.message}`);
-        throw error;
-      }
-    }
 }
+
+/**
+ * Make a single patient sync request
+ */
+async function makePatientSyncRequest(request: SyncRequest, authService: AuthService, httpService: HttpService, logger: Logger): Promise<SyncPatientsResponse | null> {
+  try {
+    const isAuthenticated = await authService.ensureAuthenticated();
+    if (!isAuthenticated) {
+      throw new Error('Failed to authenticate');
+    }
+    const syncUrl = `${authService.getBaseUrl()}/sync/patients_ids`;
+    
+    const { data } = await firstValueFrom(
+      httpService.post<SyncPatientsResponse>(
+        syncUrl,
+        request,
+        {
+          headers: { Authorization: `${authService.getAuthToken()}` }
+        }
+      ).pipe(
+        catchError((error: AxiosError) => {
+          logger.error(`Sync request failed: ${error}`);
+          throw error;
+        }),
+      ),
+    );
+
+    return data;
+  } catch (error) {
+    logger.error(`Error making sync request: ${error.message}`);
+    return null;
+  }
+}
+
+async function updatePayload(patient: any, patientService: PatientService, logger: Logger): Promise<void> {
+    try {
+      if (!patient.patientID) {
+        throw new Error('Patient ID is required');
+      }
+
+      // Use upsert to update if exists, create if doesn't exist
+      const result = await patientService.upsert(
+        { patientID: patient.patientID.toString() }, // Find by patientID
+        {
+          $set: {
+            timestamp: Date.now(),
+            message: 'Updated/Created payload from API VIA ALL',
+            data: patient
+          },
+          $setOnInsert: {
+            patientID: patient.patientID.toString() // Only set on insert
+          }
+        }
+      );
+      
+      if (result.upsertedCount > 0) {
+        logger.log(`Created new patient record for patientID: ${patient.patientID}`);
+      } else {
+        logger.log(`Updated existing patient record with patientID: ${patient.patientID}`);
+      }
+    } catch (error) {
+      logger.error(`Error updating patient record: ${error.message}`);
+      throw error;
+    }
+  }
+
+// Export the standalone functions for use elsewhere
+export { fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload };

@@ -51,7 +51,7 @@ export class AppService {
             // Parse existing data or use empty object if parsing fails
             let existingData = {};
             try {
-              existingData = existingPatient.data ? JSON.parse(existingPatient.data) : {};
+              existingData = existingPatient.data ? existingPatient.data : {};
             } catch (e) {
               console.log("Existing data was empty or invalid JSON");
             }
@@ -67,7 +67,7 @@ export class AppService {
             const updatedPatient = await this.patientModel.findOneAndUpdate(
               { patientID: patientId },
               { 
-                data: JSON.stringify(result.mergedData),
+                data: result.mergedData,
                 timestamp: payloadDto.timestamp || Date.now(),
                 message: 'Updated payload'
               },
@@ -95,7 +95,7 @@ export class AppService {
           // Create new patient record
           const newPatient = await this.patientModel.create({
             patientID: patientId,
-            data: JSON.stringify(payloadDto),
+            data: payloadDto,
             timestamp: payloadDto.timestamp || Date.now(),
             message: 'Received payload'
           });

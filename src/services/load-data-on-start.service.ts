@@ -53,21 +53,21 @@ export class LoadDataOnStartService implements OnModuleInit {
             })
           );
 
-          await this.conceptNameService.loadConceptNames(responseData.total_concept_names);
-          // await this.conceptSetService.loadConceptSet(responseData.total_concept_set);
+          // await this.conceptNameService.loadConceptNames(responseData.total_concept_names);
+          // // await this.conceptSetService.loadConceptSet(responseData.total_concept_set);
         
-          await this.facilityService.loadFacilities(responseData.total_facilities);
-          await this.countryService.loadCountries();
-          await this.drugService.loadDrugs(responseData.total_OPD_drugs);
-          await this.relationshipService.loadRelationships(responseData.total_relationships);
-          await this.wardService.loadWards();
-          await this.traditionalAuthorityService.loadTraditionalAuthorities(responseData.total_TA);
-          await this.villageService.loadVillages(responseData.total_village);
-          await this.testTypesService.loadTestTypes(responseData.total_test_types);
-          await this.testResultIndicatorService.loadIndicators();
-          await this.stockService.loadStock();
-          await this.diagnosisService.loadDiagnoses(responseData.total_diagnosis);
-          await this.specimenService.loadSpecimens(responseData.total_specimens)
+          // await this.facilityService.loadFacilities(responseData.total_facilities);
+          // await this.countryService.loadCountries();
+          // await this.drugService.loadDrugs(responseData.total_OPD_drugs);
+          // await this.relationshipService.loadRelationships(responseData.total_relationships);
+          // await this.wardService.loadWards();
+          // await this.traditionalAuthorityService.loadTraditionalAuthorities(responseData.total_TA);
+          // await this.villageService.loadVillages(responseData.total_village);
+          // await this.testTypesService.loadTestTypes(responseData.total_test_types);
+          // await this.testResultIndicatorService.loadIndicators();
+          // await this.stockService.loadStock();
+          // await this.diagnosisService.loadDiagnoses(responseData.total_diagnosis);
+          // await this.specimenService.loadSpecimens(responseData.total_specimens)
     } catch (error) {
       this.logger.error(`${error}`);
     }

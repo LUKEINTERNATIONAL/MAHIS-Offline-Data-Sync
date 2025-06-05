@@ -49,7 +49,7 @@ interface PatientData {
     }[]
   } {
     // First ensure we're comparing the same patient
-    if (existingData.patientID !== incomingData.patientID) {
+    if (parseInt(existingData.patientID as any) !== parseInt(incomingData.patientID as any)) {
       throw new Error('Patient IDs do not match');
     }
   
@@ -502,8 +502,10 @@ export function sophisticatedMergePatientData(existingData: PatientData, incomin
   changes: any[];
 } {
   // Ensure we're working with the same patient
-  if (existingData.patientID !== incomingData.patientID) {
-    throw new Error('Cannot merge data for different patients');
+  if (parseInt(existingData.patientID as any) !== parseInt(incomingData.patientID as any)) {
+    console.error("Incoming PatientID: ", incomingData.patientID)
+    console.error("existing PatientID: ",existingData.patientID )
+    throw new Error('Cannot merge data for different patients: '+existingData.patientID );
   }
 
   // Check for changes first

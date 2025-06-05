@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Document } from 'mongoose';
+import { HydratedDocument, Document, Schema as MongooseSchema } from 'mongoose';
 import { Types } from 'mongoose';
 
 export type PatientDocument = HydratedDocument<Patient>;
@@ -14,17 +14,17 @@ export class Patient extends Document {
   @Prop({ required: true })
   message: string;
 
-  @Prop({ type: String })
-  data: string;
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  data: any; // Can store any JSON object
 
   @Prop({ type: Number })
   timestamp: number;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    unique: true, 
+    unique: true,
     sparse: true,
-    index: true 
+    index: true
   })
   patientID: string;
 

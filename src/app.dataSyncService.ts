@@ -49,7 +49,7 @@ export class DataSyncService {
           let parsedData: any = {};
           try {
             if (record.data) {
-              parsedData = JSON.parse(record.data);
+              parsedData = record.data;
             }
           } catch (parseError) {
             this.logger.warn(`Failed to parse data for record ID ${record._id.toString()}: ${parseError.message}`);
@@ -126,7 +126,7 @@ export class DataSyncService {
       let parsedData: any = {};
       try {
         if (record.data) {
-          parsedData = JSON.parse(record.data);
+          parsedData = record.data;
         }
       } catch (parseError) {
         this.logger.warn(`Failed to parse data for patientID ${patientID}: ${parseError.message}`);
@@ -152,7 +152,7 @@ export class DataSyncService {
       if (responseData) {
         // Update using PatientService by patientID
         await this.patientService.updateByPatientId(patientID, {
-          data: JSON.stringify(responseData),
+          data: responseData,
           message: 'Updated from API response',
           timestamp: Date.now(),
         });

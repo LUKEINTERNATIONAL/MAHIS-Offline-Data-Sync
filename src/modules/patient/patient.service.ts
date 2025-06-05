@@ -71,4 +71,78 @@ export class PatientService {
     const patients = await this.patientModel.find({}, { patientID: 1, _id: 0 }).exec();
     return patients.map((p) => p.patientID);
   }
+
+  async searchPatientData(
+    searchCriteria: { 
+      given_name?: string; 
+      family_name?: string; 
+      gender?: string 
+    },
+    pagination: {
+      page?: number;
+      per_page?: number;
+    } = {}
+  ): Promise<{
+    data: any[];
+    pagination: {
+      current_page: number;
+      per_page: number;
+      total: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    }
+  }> {
+    const query: any = {};
+    
+    if (searchCriteria.given_name) {
+      query['data.personInformation.given_name'] = {
+        $regex: `^${searchCriteria.given_name}`,
+        $options: 'i'
+      };
+    }
+    
+    if (searchCriteria.family_name) {
+      query['data.personInformation.family_name'] = {
+        $regex: `^${searchCriteria.family_name}`,
+        $options: 'i'
+      };
+    }
+    
+    if (searchCriteria.gender) {
+      query['data.personInformation.gender'] = {
+        $regex: `^${searchCriteria.gender}`,
+        $options: 'i'
+      };
+    }
+    
+    // Pagination setup
+    const page = pagination.page || 1;
+    const per_page = pagination.per_page || 10;
+    const skip = (page - 1) * per_page;
+    
+    // Get total count for pagination info
+    const total = await this.patientModel.countDocuments(query).exec();
+    
+    // Get paginated results
+    const patients = await this.patientModel
+      .find(query, { data: 1, _id: 0 })
+      .skip(skip)
+      .limit(per_page)
+      .exec();
+    
+    const total_pages = Math.ceil(total / per_page);
+    
+    return {
+      data: patients.map(patient => patient.data),
+      pagination: {
+        current_page: page,
+        per_page: per_page,
+        total: total,
+        total_pages: total_pages,
+        has_next: page < total_pages,
+        has_prev: page > 1
+      }
+    };
+  }
 }
