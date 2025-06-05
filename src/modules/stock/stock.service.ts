@@ -35,8 +35,11 @@ export class StockService {
 
   async loadStock(count?: number): Promise<void> {
     try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
       const apiUrl = this.authService.getBaseUrl()
-
       const token = this.authService.getAuthToken()
 
       const stockRes$ = this.httpService.get(`${apiUrl}/pharmacy/items?paginate=false`, {

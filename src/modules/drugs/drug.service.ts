@@ -43,9 +43,11 @@ export class DrugService {
 
   async loadDrugs(expectedCount?: number): Promise<void> {
     try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
       const apiUrl = this.authService.getBaseUrl()
-
-    
       const token = this.authService.getAuthToken()
 
       // Fetch all drugs without pagination

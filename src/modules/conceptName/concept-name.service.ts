@@ -39,6 +39,11 @@ export class ConceptNameService {
   async loadConceptNames(count?: number): Promise<void> {
     try {
 
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
+
       const totalDocuments = await this.count();
       if (totalDocuments == count) {
         console.log("no new concepts have been added since the last sync");

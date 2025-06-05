@@ -5,9 +5,7 @@ import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Patient, PatientDocument } from './modules/patient/schema/patient.schema';
 import { User, UserDocument } from './modules/user/schema/user.schema';
-import { sophisticatedMergePatientData } from './utils/patient_record_utils';
 import { PatientService } from './modules/patient/patient.service';
 
 interface AuthResponse {
@@ -268,7 +266,7 @@ export class AuthService {
       return true;
 
     } catch (error) {
-      this.logger.error(`Error syncing patient IDs: ${error.message}`);
+      // this.logger.error(`Error syncing patient IDs: ${error.message}`);
       return false;
     }
   }

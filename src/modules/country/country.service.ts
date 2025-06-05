@@ -39,6 +39,10 @@ export class CountryService {
 
   async loadCountries(): Promise<void> {
     try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
       const apiUrl = this.authService.getBaseUrl();
       const token = this.authService.getAuthToken()
       const headers = {
