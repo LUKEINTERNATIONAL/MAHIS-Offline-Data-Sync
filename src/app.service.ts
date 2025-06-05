@@ -1,29 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Patient, PatientDocument } from './modules/patient/schema/patient.schema';
 import { PayloadDto } from './app.controller';
-import { Payload } from './payload.entity';
 import { generateQRCodeDataURL } from './utils/qrcode.util';
 import { getAPIHomePage } from './utils/htmlStr/html_responses';
-import { sophisticatedMergePatientData } from './utils/patient_record_utils'
+import { sophisticatedMergePatientData } from './utils/patient_record_utils';
 
 @Injectable()
 export class AppService {
   constructor(
-    @InjectRepository(Payload)
-    private readonly payloadRepository: Repository<Payload>,
+    @InjectModel(Patient.name)
+    private readonly patientModel: Model<PatientDocument>,
   ) {}
 
   async getHome(): Promise<string> {
-    // Get port from environment or default to 3009
     const port = process.env.PORT || 3009;
-    
-    // For the QR code, use the current server address
     const apiUrl = `http://${process.env.HOST || '192.168.0.105'}:${port}/receive-payload`;
-    
-    // Generate QR code as data URL
     const qrCodeDataUrl = await generateQRCodeDataURL(apiUrl);
-    
     return getAPIHomePage(port, apiUrl, qrCodeDataUrl);
   }
 
@@ -31,36 +25,29 @@ export class AppService {
     const results = [];
     
     for (const payloadDto of payloadDtos) {
-      // Create a new payload entity
-      const payload = new Payload();
-      payload.message = 'Received payload';
-      payload.data = payloadDto ? JSON.stringify(payloadDto) : null;
-      payload.timestamp = payloadDto.timestamp || Date.now();
-      
-      // Extract patientID from payload data or use from DTO if provided directly
-      if (payloadDto.patientID) {
-        payload.patientID = payloadDto.patientID;
-      } else if (payloadDto.data && payloadDto.data.patientID) {
-        payload.patientID = payloadDto.data.patientID;
-      }
-  
       try {
+        const patientId = payloadDto.patientID || (payloadDto.data && payloadDto.data.patientID);
+        
+        if (!patientId) {
+          throw new Error('Patient ID is required');
+        }
+
         // Check if patient record already exists
-        const existingPayload = await this.payloadRepository.findOne({
-          where: { patientID: payload.patientID }
+        const existingPatient = await this.patientModel.findOne({ 
+          patientID: patientId 
         });
-  
+
         let hasChanges = false;
-  
-        if (existingPayload) {
+
+        if (existingPatient) {
           try {
             // Parse the incoming payload data
-            const newData = JSON.parse(payload.data);
+            const newData = payloadDto;
             
             // Parse existing data or use empty object if parsing fails
             let existingData = {};
             try {
-              existingData = existingPayload.data ? JSON.parse(existingPayload.data) : {};
+              existingData = existingPatient.data ? JSON.parse(existingPatient.data) : {};
             } catch (e) {
               console.log("Existing data was empty or invalid JSON");
             }
@@ -68,40 +55,52 @@ export class AppService {
             // If existing data is empty, use new data directly
             const result = Object.keys(existingData).length === 0 
               ? { mergedData: newData, hasChanges: false }
-              : sophisticatedMergePatientData(existingData as any, newData) as any;
+              : sophisticatedMergePatientData(existingData as any, newData as any) as any;
             
             hasChanges = result.hasChanges;
-            existingPayload.data = JSON.stringify(result.mergedData);
+
+            // Update existing patient record
+            const updatedPatient = await this.patientModel.findOneAndUpdate(
+              { patientID: patientId },
+              { 
+                data: JSON.stringify(result.mergedData),
+                timestamp: payloadDto.timestamp || Date.now(),
+                message: 'Updated payload'
+              },
+              { new: true }
+            );
+
+            results.push({
+              success: true,
+              message: 'Payload updated successfully',
+              id: updatedPatient._id,
+              patientID: updatedPatient.patientID,
+              timestamp: new Date().toISOString(),
+              updated: true,
+              record: updatedPatient.data,
+              hasChanges: hasChanges,
+            });
           } catch (e) {
             console.error('Error parsing payload data:', e);
             throw e;
           }
-  
-          existingPayload.timestamp = payload.timestamp;
-          existingPayload.message = 'Updated payload';
-          
-          const updatedPayload = await this.payloadRepository.save(existingPayload);
-          results.push({
-            success: true,
-            message: 'Payload updated successfully',
-            id: updatedPayload.id,
-            patientID: updatedPayload.patientID,
-            timestamp: new Date().toISOString(),
-            updated: true,
-            record: existingPayload.data,
-            hasChanges: hasChanges,
-          });
         } else {
-          // Save new payload if no existing record found
-          const savedPayload = await this.payloadRepository.save(payload);
+          // Create new patient record
+          const newPatient = await this.patientModel.create({
+            patientID: patientId,
+            data: JSON.stringify(payloadDto),
+            timestamp: payloadDto.timestamp || Date.now(),
+            message: 'Received payload'
+          });
+
           results.push({
             success: true,
             message: 'Payload received and saved successfully',
-            id: savedPayload.id,
-            patientID: savedPayload.patientID,
+            id: newPatient._id,
+            patientID: newPatient.patientID,
             timestamp: new Date().toISOString(),
             updated: false,
-            hasChanges: hasChanges,
+            hasChanges: false,
           });
         }
       } catch (error) {
@@ -109,7 +108,7 @@ export class AppService {
         results.push({
           success: false,
           message: 'Error processing payload',
-          patientID: payload.patientID,
+          patientID: payloadDto.patientID,
           timestamp: new Date().toISOString(),
           error: error.message,
         });
@@ -120,17 +119,15 @@ export class AppService {
   }
 
   async getAllPatientIds(): Promise<string[]> {
-    const payloads = await this.payloadRepository.find({
-      select: ['patientID']
-    });
-    return payloads.map(payload => payload.patientID);
+    const patients = await this.patientModel.find().select('patientID -_id');
+    return patients.map(patient => patient.patientID);
   }
 
   async getPatientPayload(patientId: string) {
-    const payload = await this.payloadRepository.findOne({
-      where: { patientID: patientId }
-    });
-    
-    return payload;
+    const patient = await this.patientModel.findOne({ patientID: patientId });
+    if (!patient) {
+      throw new NotFoundException(`Patient with ID ${patientId} not found`);
+    }
+    return patient;
   }
 }

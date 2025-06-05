@@ -11,6 +11,6 @@ import { PatientService } from './patient.service';
   ],
   controllers: [PatientController],
   providers: [PatientService],
-//   exports: [ConceptNameService], 
+  exports: [PatientService, MongooseModule], // Export MongooseModule to make Patient model available
 })
 export class PatientModule {}

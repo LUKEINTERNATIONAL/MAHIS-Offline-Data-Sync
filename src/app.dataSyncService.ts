@@ -1,12 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { catchError, firstValueFrom } from 'rxjs';
-import { AxiosError } from 'axios';
-import { Payload } from './payload.entity';
-import { sophisticatedMergePatientData } from './utils/patient_record_utils';
+import { PatientService } from './modules/patient/patient.service';
 import { AuthService } from './app.authService';
+import { lastValueFrom } from 'rxjs';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class DataSyncService {
@@ -14,9 +11,8 @@ export class DataSyncService {
 
   constructor(
     private readonly httpService: HttpService,
-    private authService: AuthService,
-    @InjectRepository(Payload)
-    private payloadRepository: Repository<Payload>,
+    private readonly authService: AuthService,
+    private readonly patientService: PatientService,
   ) {}
 
   /**
@@ -24,15 +20,13 @@ export class DataSyncService {
    */
   async syncPatientRecords() {
     try {
-      // Ensure we have a valid token
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
         throw new Error('Failed to authenticate');
       }
 
-      // Get all records from database
       this.logger.log('Fetching all patient records from database');
-      const allRecords = await this.payloadRepository.find();
+      const allRecords = await this.patientService.findAll();
       
       if (!allRecords || allRecords.length === 0) {
         this.logger.log('No records found in database to sync');
@@ -40,11 +34,8 @@ export class DataSyncService {
       }
 
       this.logger.log(`Found ${allRecords.length} records to sync`);
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
       
-      // The endpoint for saving patient records
-      const saveUrl = `${this.authService.getBaseUrl()}/api/v1/save_patient_record`;
-      
-      // Track sync results
       const results = {
         total: allRecords.length,
         successful: 0,
@@ -53,86 +44,51 @@ export class DataSyncService {
         updatedRecords: [],
       };
 
-      // Process each record
       for (const record of allRecords) {
         try {
-          // Parse the data field from string to JSON
-          let parsedData = {};
+          let parsedData: any = {};
           try {
             if (record.data) {
               parsedData = JSON.parse(record.data);
             }
           } catch (parseError) {
-            this.logger.warn(`Failed to parse data for record ID ${record.id}: ${parseError.message}`);
-            // If we can't parse the data, use an empty object
-            parsedData = {};
+            this.logger.warn(`Failed to parse data for record ID ${record._id.toString()}: ${parseError.message}`);
           }
 
-          // Prepare the payload to send - spreading the parsed data into the record
           const syncPayload = {
             record: {
               ...parsedData,
+              patientID: record.patientID, // Explicitly include patientID
               timestamp: record.timestamp,
             }
-          } as any;
+          };
 
-          // Send the data to the external API
-          const { data: responseData } = await firstValueFrom(
+          const { data: responseData } = await lastValueFrom(
             this.httpService.post(saveUrl, syncPayload, {
               headers: {
                 Authorization: this.authService.getAuthToken(),
                 'Content-Type': 'application/json',
               },
-            }).pipe(
-              catchError((error: AxiosError) => {
-                this.logger.error(`Failed to sync record ID ${record.id}: ${error.message}`);
-                if (error.response) {
-                  this.logger.error(`Response status: ${error.response.status}`);
-                  this.logger.error(`Response data: ${JSON.stringify(error.response.data)}`);
-                }
-                
-                // Add to failure count but continue with other records
-                results.failed++;
-                results.errors.push({
-                  recordId: record.id,
-                  patientID: record.patientID,
-                  error: error.message,
-                });
-                
-                throw new Error(`API sync failed: ${error.message}`);
-              }),
-            ),
+            })
           );
 
-          // Update the local record with the API response
-          let responseString = JSON.stringify(responseData);
           if (responseData) {
-            console.log(responseData)
-            // Merge patient data if patient IDs match
-            if (syncPayload.record && syncPayload.record.patientID == responseData.patientID) {
-              // const result = sophisticatedMergePatientData(syncPayload.record as any, responseData as any) as any;
-              responseString = JSON.stringify(responseData);
-            }
+            // Update using PatientService by MongoDB _id
+            await this.patientService.updateById(record._id.toString(), {
+              data: JSON.stringify(responseData),
+              message: 'Updated from API response',
+              timestamp: Date.now(),
+            });
             
-            // Update the local database record
-            await this.payloadRepository.update(
-              { id: record.id },
-              { 
-                data: responseString,
-                message: 'Updated from API response'
-              }
-            );
-            
-            this.logger.log(`Successfully synced and updated record ID ${record.id} for patient ${record.patientID}`);
             results.successful++;
-            results.updatedRecords.push(record.id);
+            results.updatedRecords.push(record._id);
           }
 
         } catch (syncError) {
-          this.logger.error(`Error processing record ID ${record.id}: ${syncError.message}`);
+          this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
           results.failed++;
           results.errors.push({
-            recordId: record.id,
+            recordId: record._id.toString(),
             patientID: record.patientID,
             error: syncError.message,
           });
@@ -147,6 +103,101 @@ export class DataSyncService {
       };
     } catch (error) {
       this.logger.error(`Patient record sync failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync specific patient record by patientID
+   */
+  async syncPatientRecord(patientID: string) {
+    try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
+
+      this.logger.log(`Syncing specific patient record: ${patientID}`);
+      const record = await this.patientService.findByPatientId(patientID);
+      
+      if (!record) {
+        this.logger.warn(`Patient record not found: ${patientID}`);
+        return { success: false, message: 'Patient record not found' };
+      }
+
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+      
+      let parsedData: any = {};
+      try {
+        if (record.data) {
+          parsedData = JSON.parse(record.data);
+        }
+      } catch (parseError) {
+        this.logger.warn(`Failed to parse data for patientID ${patientID}: ${parseError.message}`);
+      }
+
+      const syncPayload = {
+        record: {
+          ...parsedData,
+          patientID: record.patientID,
+          timestamp: record.timestamp,
+        }
+      };
+
+      const { data: responseData } = await lastValueFrom(
+        this.httpService.post(saveUrl, syncPayload, {
+          headers: {
+            Authorization: this.authService.getAuthToken(),
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      if (responseData) {
+        // Update using PatientService by patientID
+        await this.patientService.updateByPatientId(patientID, {
+          data: JSON.stringify(responseData),
+          message: 'Updated from API response',
+          timestamp: Date.now(),
+        });
+        
+        this.logger.log(`Successfully synced patient record: ${patientID}`);
+        return {
+          success: true,
+          message: `Successfully synced patient ${patientID}`,
+          patientID,
+          recordId: record._id,
+        };
+      }
+
+      return { success: false, message: 'No response data received' };
+
+    } catch (error) {
+      this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get sync status for all patients
+   */
+  async getSyncStatus() {
+    try {
+      const allRecords = await this.patientService.findAll();
+      
+      const status = {
+        totalRecords: allRecords.length,
+        lastSyncedRecords: allRecords.filter(record => 
+          record.message && record.message.includes('Updated from API response')
+        ).length,
+        pendingSync: allRecords.filter(record => 
+          !record.message || !record.message.includes('Updated from API response')
+        ).length,
+      };
+
+      return status;
+    } catch (error) {
+      this.logger.error(`Failed to get sync status: ${error.message}`);
       throw error;
     }
   }
