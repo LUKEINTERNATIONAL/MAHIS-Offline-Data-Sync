@@ -66,4 +66,9 @@ export class PatientService {
   async delete(patientID: string): Promise<Patient | null> {
     return this.deleteByPatientId(patientID);
   }
+
+  async getAllPatientIDs(): Promise<string[]> {
+    const patients = await this.patientModel.find({}, { patientID: 1, _id: 0 }).exec();
+    return patients.map((p) => p.patientID);
+  }
 }
