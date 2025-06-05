@@ -6,12 +6,16 @@ import { PayloadDto } from './app.controller';
 import { generateQRCodeDataURL } from './utils/qrcode.util';
 import { getAPIHomePage } from './utils/htmlStr/html_responses';
 import { sophisticatedMergePatientData } from './utils/patient_record_utils';
+import { SyncGateway } from './websocket/gateways/sync.gateway';
+import { PatientService } from './modules/patient/patient.service';
 
 @Injectable()
 export class AppService {
   constructor(
     @InjectModel(Patient.name)
     private readonly patientModel: Model<PatientDocument>,
+    private readonly syncGateway: SyncGateway,
+    private readonly patientService: PatientService,
   ) {}
 
   async getHome(): Promise<string> {
@@ -70,6 +74,9 @@ export class AppService {
               { new: true }
             );
 
+            // Trigger WebSocket broadcast
+            this.syncGateway.broadcastPatientUpdate(updatedPatient.patientID, result.mergedData);
+
             results.push({
               success: true,
               message: 'Payload updated successfully',
@@ -119,8 +126,7 @@ export class AppService {
   }
 
   async getAllPatientIds(): Promise<string[]> {
-    const patients = await this.patientModel.find().select('patientID -_id');
-    return patients.map(patient => patient.patientID);
+    return this.patientService.getAllPatientIDs();
   }
 
   async getPatientPayload(patientId: string) {
@@ -129,5 +135,12 @@ export class AppService {
       throw new NotFoundException(`Patient with ID ${patientId} not found`);
     }
     return patient;
+  }
+
+  async testConnection() {
+    return {
+      connection_status: 'available',
+      timestamp: new Date().toISOString()
+    };
   }
 }

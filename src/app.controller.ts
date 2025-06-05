@@ -40,4 +40,9 @@ export class AppController {
     }
     return JSON.parse(payload.data);
   }
+
+  @Get('test-connection')
+  testConnection() {
+    return this.appService.testConnection();
+  }
 }
