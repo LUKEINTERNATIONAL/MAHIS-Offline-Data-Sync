@@ -27,6 +27,10 @@ export class DiagnosisService {
     return this.diagnosisModel.findOne({ id }).exec();
   }
 
+  async count(): Promise<number> {
+    return this.diagnosisModel.countDocuments().exec();
+  }
+
   async update(
     id: number,
     data: Partial<Diagnosis>
@@ -40,7 +44,7 @@ export class DiagnosisService {
     return this.diagnosisModel.findOneAndDelete({ id }).exec();
   }
 
-  async loadDiagnoses(): Promise<void> {
+  async loadDiagnoses(expectedCount?: number): Promise<void> {
     try {
       const apiUrl = this.configService.get<string>("API_BASE_URL");
 
@@ -59,25 +63,28 @@ export class DiagnosisService {
           headers: {
             Authorization: token,
           },
-          data: {
-            id: 7409,
-          },
         }
       );
       const diagnosesResponse = await lastValueFrom(diagnosesResponse$);
       const diagnoses = diagnosesResponse.data;
 
-      for (const diagnosis of diagnoses) {
-        const { concept_id, ...rest } = diagnosis;
+      const totalDocuments = await this.count();
 
-        await this.diagnosisModel.findOneAndUpdate(
-          { concept_id },
-          { concept_id, ...rest },
-          { upsert: true, new: true }
-        );
+      if (expectedCount && totalDocuments === expectedCount) {
+        console.log("No new diagnoses to update.");
+        return;
       }
 
-      console.log(`${diagnoses.length} diagnoses loaded.`);
+      // Clear existing
+      await this.diagnosisModel.deleteMany({});
+
+      // Bulk insert
+      if (diagnoses.length > 0) {
+        await this.diagnosisModel.insertMany(diagnoses);
+        console.log(`${diagnoses.length} diagnoses loaded.`);
+      } else {
+        console.log("No diagnoses found.");
+      }
     } catch (error) {
       console.error("Error loading diagnoses:", error?.response?.data || error);
       throw new Error("Failed to load diagnoses.");

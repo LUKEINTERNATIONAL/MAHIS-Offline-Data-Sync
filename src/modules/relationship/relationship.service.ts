@@ -6,14 +6,13 @@ import { lastValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 
-
 @Injectable()
 export class RelationshipService {
   constructor(
     @InjectModel(Relationship.name)
-    private relationshipModel: Model<RelationshipDocument>,
-    private configService: ConfigService,
-    private httpService: HttpService
+    private readonly relationshipModel: Model<RelationshipDocument>,
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService
   ) {}
 
   async create(data: Partial<Relationship>): Promise<Relationship> {
@@ -24,21 +23,27 @@ export class RelationshipService {
     return this.relationshipModel.find().exec();
   }
 
+  // Assuming 'relationship_type_id' is your unique identifier, not just 'id'
   async findById(id: number): Promise<Relationship | null> {
-    return this.relationshipModel.findOne({ id }).exec();
+    return this.relationshipModel.findOne({ relationship_type_id: id }).exec();
   }
 
   async update(id: number, data: Partial<Relationship>): Promise<Relationship | null> {
-    return this.relationshipModel.findOneAndUpdate({ id }, data, { new: true }).exec();
+    return this.relationshipModel.findOneAndUpdate({ relationship_type_id: id }, data, { new: true }).exec();
   }
 
   async delete(id: number): Promise<Relationship | null> {
-    return this.relationshipModel.findOneAndDelete({ id }).exec();
+    return this.relationshipModel.findOneAndDelete({ relationship_type_id: id }).exec();
   }
-  async loadRelationships(): Promise<void> {
+
+  async count(): Promise<number> {
+    return this.relationshipModel.countDocuments().exec();
+  }
+
+  async loadRelationships(expectedCount?: number): Promise<void> {
     try {
       const apiUrl = this.configService.get<string>('API_BASE_URL');
-  
+
       // Authenticate
       const authResponse$ = this.httpService.post(`${apiUrl}/auth/login`, {
         username: this.configService.get<string>('API_USERNAME'),
@@ -46,31 +51,28 @@ export class RelationshipService {
       });
       const authResponse = await lastValueFrom(authResponse$);
       const token = authResponse.data.authorization.token;
-  
-      // Fetch relationship data
-      const relationshipsResponse$ = this.httpService.get(
-        `${apiUrl}/types/relationships?paginate=false`,
-        {
-          headers: {
-            Authorization: token,
-          },
-        }
-      );
+
+      // Fetch relationships without pagination
+      const relationshipsResponse$ = this.httpService.get(`${apiUrl}/types/relationships?paginate=false`, {
+        headers: { Authorization: token },
+      });
       const relationshipsResponse = await lastValueFrom(relationshipsResponse$);
       const relationships = relationshipsResponse.data;
-  
-      // Bulk upsert all relationships (no filtering)
-      const bulkOps = relationships.map(({ relationship_type_id, ...rest }) => ({
-        updateOne: {
-          filter: { relationship_type_id },
-          update: { $set: { relationship_type_id, ...rest } },
-          upsert: true,
-        },
-      }));
-  
-      if (bulkOps.length > 0) {
-        await this.relationshipModel.bulkWrite(bulkOps);
-        console.log(`${bulkOps.length} relationships loaded.`);
+
+      // Check if already up-to-date
+      const totalInDb = await this.count();
+      if (expectedCount && totalInDb === expectedCount) {
+        console.log('Relationships already up to date.');
+        return;
+      }
+
+      // Clear existing relationships first
+      await this.relationshipModel.deleteMany({});
+
+      // Insert all relationships at once
+      if (relationships.length > 0) {
+        await this.relationshipModel.insertMany(relationships);
+        console.log(`${relationships.length} relationships loaded.`);
       } else {
         console.log('No relationships found to load.');
       }
@@ -79,5 +81,4 @@ export class RelationshipService {
       throw new Error('Could not load relationships');
     }
   }
-  
 }

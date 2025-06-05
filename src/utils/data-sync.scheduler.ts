@@ -31,7 +31,7 @@ export class DataSyncScheduler implements OnModuleInit {
         this.logger.log('Running initial patient record sync job after 120 second delay');
         try {
           // TODO: Uncomment the line below to enable initial sync
-          // await this.syncPatientRecords();
+          await this.syncPatientRecords();
         } catch (error) {
           this.logger.error(`Initial sync failed: ${error.message}`);
         }

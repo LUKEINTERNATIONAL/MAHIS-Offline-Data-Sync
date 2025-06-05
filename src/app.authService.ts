@@ -3,11 +3,12 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
-import { Payload } from './payload.entity';
-import { sophisticatedMergePatientData } from './utils/patient_record_utils'
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Patient, PatientDocument } from './modules/patient/schema/patient.schema';
+import { User, UserDocument } from './modules/user/schema/user.schema';
+import { sophisticatedMergePatientData } from './utils/patient_record_utils';
+import { PatientService } from './modules/patient/patient.service';
 
 interface AuthResponse {
   authorization: {
@@ -45,10 +46,9 @@ export class AuthService {
   constructor(
     private readonly httpService: HttpService,
     private configService: ConfigService,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(Payload)
-    private readonly payloadRepository: Repository<Payload>,
+    private readonly patientService: PatientService,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {
     this.baseUrl = this.configService.get<string>('API_BASE_URL');
   }
@@ -58,7 +58,7 @@ export class AuthService {
    */
   async login(): Promise<boolean> {
     try {
-      const loginUrl = `${this.baseUrl}/api/v1/auth/login`;
+      const loginUrl = `${this.baseUrl}/auth/login`;
       const loginData = {
         username: this.configService.get<string>('API_USERNAME'),
         password: this.configService.get<string>('API_PASSWORD'),
@@ -85,23 +85,19 @@ export class AuthService {
         this.authToken = data.authorization.token;
         this.tokenExpiry = new Date(data.authorization.expiry_time);
 
-        // Create or update user entity
-        const user = new User();
-        user.id = data.authorization.user.user_id;
-        user.locationId = data.authorization.user.location_id;
+        // Create or update user 
+        const userData = {
+          id: data.authorization.user.user_id,
+          locationId: data.authorization.user.location_id.toString()
+        };
 
-        // Get all existing users
-        const existingUsers = await this.userRepository.find();
+        // Remove existing users
+        await this.userModel.deleteMany({});
 
-        // If there are any records, remove them
-        if (existingUsers.length > 0) {
-            await this.userRepository.remove(existingUsers);
-        }
-
-        // Save the new user record
-        const savedUser = await this.userRepository.save(user);
+        // Save new user
+        await this.userModel.create(userData);
         
-        this.logger.log(`User data saved successfully for ID: ${savedUser.id}`);
+        this.logger.log(`User data saved successfully for ID: ${userData.id}`);
         this.logger.log(`Login successful. Token valid until: ${this.tokenExpiry}`);
         return true;
       } else {
@@ -179,36 +175,30 @@ export class AuthService {
     try {
       await this.ensureAuthenticated();
       
-      // Get the user from repository with proper selection criteria
-      const user = await this.userRepository.findOne({
-        where: {},  // Empty where clause to get any user
-        order: { id: 'DESC' }
-      });
+      // Get the most recent user
+      const user = await this.userModel.findOne().sort({ id: -1 });
 
       if (!user) {
-        this.logger.error('No user found in the repository');
+        this.logger.error('No user found in the database');
         return null;
       }
 
-      const userUrl = `${this.baseUrl}/api/v1/users/${user.id}`;
+      const userUrl = `${this.baseUrl}/users/${user.id}`;
       
       const { data } = await firstValueFrom(
-        this.httpService.get<UserResponse>(userUrl, {
+        this.httpService.get(userUrl, {
           headers: { Authorization: `${this.authToken}` }
-        }).pipe(
-          catchError((error: AxiosError) => {
-            this.logger.error(`Failed to fetch user data: ${error.message}`);
-            throw error;
-          }),
-        ),
-      ) as any;
+        })
+      );
 
-    //   console.log('User data fetched successfully:', data);
+      // Update user with new data
+      const updatedUser = await this.userModel.findOneAndUpdate(
+        { id: user.id },
+        { locationId: data.location_id },
+        { new: true }
+      );
 
-      // Update the user with new data
-    //   user.locationId = data.location_id;
-    //   return await this.userRepository.save(user);
-
+      return updatedUser;
     } catch (error) {
       this.logger.error(`Error fetching/saving user data: ${error.message}`);
       return null;
@@ -288,7 +278,7 @@ export class AuthService {
    */
   private async makePatientSyncRequest(request: SyncRequest): Promise<SyncPatientsResponse | null> {
     try {
-      const syncUrl = `${this.baseUrl}/api/v1/sync/patients_ids`;
+      const syncUrl = `${this.baseUrl}/sync/patients_ids`;
       
       const { data } = await firstValueFrom(
         this.httpService.post<SyncPatientsResponse>(
@@ -313,34 +303,34 @@ export class AuthService {
   }
 
   private async updatePayload(patient: any): Promise<void> {
-    try {
-        // Find existing payload for this patient
-        const existingPayload = await this.payloadRepository.findOne({
-            where: { patientID: patient.patientID?.toString() }
-        });
-
-        if (existingPayload) {
-            if (existingPayload.patientID == patient.patientID) {
-                // this.logger.log(`Found existing payload for patient ID: ${patient.patientID}`);
-                // const result = sophisticatedMergePatientData(JSON.parse(existingPayload.data) as any, patient as any) as any;
-                // existingPayload.data = JSON.stringify(result.mergedData);
-                existingPayload.timestamp = Date.now();
-                existingPayload.message = 'Updated payload from API VIA ALL';
-                existingPayload.data = JSON.stringify(patient);
-                await this.payloadRepository.save(existingPayload);
-            }
-        } else {
-            this.logger.log(`Creating new payload for patient ID: ${patient.patientID}`);
-            const newPayload = new Payload();
-            newPayload.patientID = patient.patientID.toString();
-            newPayload.message = 'Created payload from API';
-            newPayload.timestamp = Date.now();
-            newPayload.data = JSON.stringify(patient);
-            await this.payloadRepository.save(newPayload);
+      try {
+        if (!patient.patientID) {
+          throw new Error('Patient ID is required');
         }
-    } catch (error) {
-        this.logger.error(`Error updating payload: ${error.message}`);
+
+        // Use upsert to update if exists, create if doesn't exist
+        const result = await this.patientService.upsert(
+          { patientID: patient.patientID.toString() }, // Find by patientID
+          {
+            $set: {
+              timestamp: Date.now(),
+              message: 'Updated/Created payload from API VIA ALL',
+              data: JSON.stringify(patient)
+            },
+            $setOnInsert: {
+              patientID: patient.patientID.toString() // Only set on insert
+            }
+          }
+        );
+        
+        if (result.upsertedCount > 0) {
+          this.logger.log(`Created new patient record for patientID: ${patient.patientID}`);
+        } else {
+          this.logger.log(`Updated existing patient record with patientID: ${patient.patientID}`);
+        }
+      } catch (error) {
+        this.logger.error(`Error updating patient record: ${error.message}`);
         throw error;
+      }
     }
-  }
 }

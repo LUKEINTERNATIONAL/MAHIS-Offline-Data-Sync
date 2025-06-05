@@ -40,7 +40,6 @@ export class LoadDataOnStartService implements OnModuleInit {
 
   async onModuleInit() {
     const apiUrl = this.configService.get<string>("API_BASE_URL");
-
     const response$ = this.httpService.post(`${apiUrl}/auth/login`, {
       username: this.configService.get<string>("API_USERNAME"),
       password: this.configService.get<string>("API_PASSWORD"),
@@ -55,22 +54,21 @@ export class LoadDataOnStartService implements OnModuleInit {
     );
     const totalsResponse = await lastValueFrom(totalsResponse$);
 
-
-
-
+    console.log("Loading concept set data on module initialization...");
     await this.conceptNameService.loadConceptNames(totalsResponse.data.total_concept_names);
-    // await this.conceptSetService.loadConceptSet();
-    // await this.facilityService.loadFacilities();
-    // await this.countryService.loadCountries();
-    // await this.drugService.loadDrugs();
-    // await this.relationshipService.loadRelationships();
-    // await this.wardService.loadWards();
-    // await this.traditionalAuthorityService.loadTraditionalAuthorities();
-    // await this.villageService.loadVillages();
-    // await this.testTypesService.loadTestTypes();
-    // await this.testResultIndicatorService.loadIndicators();
-    // await this.stockService.loadStock();
-    // await this.diagnosisService.loadDiagnoses();
-    // await this.specimenService.loadSpecimen();
+    await this.conceptSetService.loadConceptSet(totalsResponse.data.total_concept_set);
+  
+    await this.facilityService.loadFacilities(totalsResponse.data.total_facilities);
+    await this.countryService.loadCountries();
+    await this.drugService.loadDrugs(totalsResponse.data.total_OPD_drugs);
+    await this.relationshipService.loadRelationships(totalsResponse.data.total_relationships);
+    await this.wardService.loadWards();
+    await this.traditionalAuthorityService.loadTraditionalAuthorities(totalsResponse.data.total_TA);
+    await this.villageService.loadVillages(totalsResponse.data.total_village);
+    await this.testTypesService.loadTestTypes(totalsResponse.data.total_test_types);
+    await this.testResultIndicatorService.loadIndicators();
+    await this.stockService.loadStock();
+    await this.diagnosisService.loadDiagnoses(totalsResponse.data.total_diagnosis);
+    await this.specimenService.loadSpecimens(totalsResponse.data.total_specimens)
   }
 }

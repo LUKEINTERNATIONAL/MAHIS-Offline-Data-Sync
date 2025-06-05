@@ -1,18 +1,16 @@
 import { Module } from "@nestjs/common";
-import { TypeOrmModule } from "@nestjs/typeorm";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { MongooseModule } from "@nestjs/mongoose";
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { DataSyncService } from "./app.dataSyncService";
 import { DataSyncScheduler } from "./utils/data-sync.scheduler";
-import { Payload } from "./payload.entity";
 import { AuthService } from "./app.authService";
 import { User } from "./entities/user.entity";
 import { SyncGateway } from "./websocket/gateways/sync.gateway";
-import { MongooseModule } from "@nestjs/mongoose";
 import { ConceptNameModule } from "./modules/conceptName/concept-name.module";
 import { WardModule } from "./modules/wards/ward.module";
 import { PatientModule } from "./modules/patient/patient.module";
@@ -31,6 +29,7 @@ import { CountryModule } from "./modules/country/country.module";
 import { LoadDataOnStartService } from "./services/load-data-on-start.service";
 import { VillageModule } from "./modules/village/village.module";
 import { SpecimenModule } from "./modules/specimen/specimen.module";
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -45,19 +44,12 @@ import { SpecimenModule } from "./modules/specimen/specimen.module";
     ScheduleModule.forRoot(),
 
     // Database configuration
-    TypeOrmModule.forRoot({
-      type: "sqlite",
-      database: "database.sqlite",
-      entities: [Payload, User],
-      synchronize: true, // Only use in development!
-    }),
+    MongooseModule.forRoot("mongodb://localhost:27017/mahis"),
   
     // Register entities
-    TypeOrmModule.forFeature([Payload, User]),
-    MongooseModule.forRoot("mongodb://localhost:27017/mahis"),
+    PatientModule,
     ConceptNameModule,
     WardModule,
-    PatientModule,
     TraditionalAuthorityModule,
     ConceptSetModule,
     DrugModule,
@@ -71,7 +63,8 @@ import { SpecimenModule } from "./modules/specimen/specimen.module";
     FacilityModule, 
     CountryModule,
     VillageModule,
-    SpecimenModule 
+    SpecimenModule,
+    UserModule, 
   ],
   controllers: [AppController],
   providers: [
@@ -82,6 +75,6 @@ import { SpecimenModule } from "./modules/specimen/specimen.module";
     SyncGateway,
     LoadDataOnStartService
   ],
-  // exports: [AuthService, DataSyncService],
+  exports: [AuthService, DataSyncService],
 })
 export class AppModule {}
