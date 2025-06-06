@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { PatientService } from './modules/patient/patient.service';
 import { AuthService } from './app.authService';
 import { lastValueFrom } from 'rxjs';
-import { Types } from 'mongoose';
+import { SyncGateway } from './websocket/gateways/sync.gateway';
 
 @Injectable()
 export class DataSyncService {
@@ -13,6 +13,7 @@ export class DataSyncService {
     private readonly httpService: HttpService,
     private readonly authService: AuthService,
     private readonly patientService: PatientService,
+    private readonly syncGateway: SyncGateway,
   ) {}
 
   /**
@@ -75,6 +76,7 @@ export class DataSyncService {
           if (responseData) {
             // Update using PatientService by MongoDB _id
             await this.patientService.updateByPatientId(record.patientID, parsedData);
+            this.syncGateway.broadcastPatientUpdate(record.patientID, parsedData);
             
             results.successful++;
             results.updatedRecords.push(record._id);
@@ -99,7 +101,7 @@ export class DataSyncService {
       };
     } catch (error) {
       this.logger.error(`Patient record sync failed: ${error.message}`, error.stack);
-      throw error;
+      // throw error;
     }
   }
 
@@ -156,6 +158,8 @@ export class DataSyncService {
           message: 'Updated from API response',
           timestamp: Date.now(),
         });
+
+        this.syncGateway.broadcastPatientUpdate(patientID, responseData);
         
         this.logger.log(`Successfully synced patient record: ${patientID}`);
         return {
@@ -170,7 +174,7 @@ export class DataSyncService {
 
     } catch (error) {
       this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
-      throw error;
+      // throw error;
     }
   }
 
