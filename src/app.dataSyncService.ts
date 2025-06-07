@@ -59,7 +59,7 @@ export class DataSyncService {
           const syncPayload = {
             record: {
               ...parsedData,
-              patientID: record.patientID, // Explicitly include patientID
+              patientID: parsedData.ID, // Explicitly include patientID
               timestamp: record.timestamp,
             }
           };
@@ -137,7 +137,6 @@ export class DataSyncService {
       const syncPayload = {
         record: {
           ...parsedData,
-          patientID: record.patientID,
           timestamp: record.timestamp,
         }
       };

@@ -30,7 +30,7 @@ export class AppService {
     
     for (const payloadDto of payloadDtos) {
       try {
-        const patientId = payloadDto.patientID || (payloadDto.data && payloadDto.data.patientID);
+        const patientId = payloadDto.patientID || (payloadDto.data && payloadDto.data.ID);
         
         if (!patientId) {
           throw new Error('Patient ID is required');
@@ -106,7 +106,7 @@ export class AppService {
             success: true,
             message: 'Payload received and saved successfully',
             id: newPatient._id,
-            patientID: newPatient.patientID,
+            patientID: newPatient.data.ID,
             timestamp: new Date().toISOString(),
             updated: false,
             hasChanges: false,

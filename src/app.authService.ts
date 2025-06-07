@@ -231,7 +231,6 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
 
       // console.log('First response:', firstResponse.sync_patients);
       firstResponse.sync_patients.forEach((patient) => {
-          // console.log('Patient:', patient.patientID);
           updatePayload(patient, patientService, logger);
       })
 
@@ -258,7 +257,6 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
 
       // console.log('First response:', firstResponse.sync_patients);
       response.sync_patients.forEach((patient) => {
-          // console.log('Patient:', patient.patientID);
           updatePayload(patient, patientService, logger);
       })
 
@@ -310,13 +308,13 @@ async function makePatientSyncRequest(request: SyncRequest, authService: AuthSer
 
 async function updatePayload(patient: any, patientService: PatientService, logger: Logger): Promise<void> {
     try {
-      if (!patient.patientID) {
+      if (!patient.ID) {
         throw new Error('Patient ID is required');
       }
 
       // Use upsert to update if exists, create if doesn't exist
       const result = await patientService.upsert(
-        { patientID: patient.patientID.toString() }, // Find by patientID
+        { patientID: patient.ID.toString() }, // Find by patientID
         {
           $set: {
             timestamp: Date.now(),
@@ -324,15 +322,15 @@ async function updatePayload(patient: any, patientService: PatientService, logge
             data: patient
           },
           $setOnInsert: {
-            patientID: patient.patientID.toString() // Only set on insert
+            patientID: patient.ID.toString() // Only set on insert
           }
         }
       );
       
       if (result.upsertedCount > 0) {
-        logger.log(`Created new patient record for patientID: ${patient.patientID}`);
+        logger.log(`Created new patient record for patientID: ${patient.ID}`);
       } else {
-        logger.log(`Updated existing patient record with patientID: ${patient.patientID}`);
+        logger.log(`Updated existing patient record with patientID: ${patient.ID}`);
       }
     } catch (error) {
       logger.error(`Error updating patient record: ${error.message}`);
