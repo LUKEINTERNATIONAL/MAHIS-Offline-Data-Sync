@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Patient, PatientDocument } from './schema/patient.schema';
 
+
 @Injectable()
 export class PatientService {
+  private readonly logger = new Logger(PatientService.name);
   constructor(
     @InjectModel(Patient.name)
     private patientModel: Model<PatientDocument>,
@@ -120,6 +122,9 @@ export class PatientService {
     const page = pagination.page || 1;
     const per_page = pagination.per_page || 10;
     const skip = (page - 1) * per_page;
+
+    this.logger.log(`Search criteria: ${JSON.stringify(searchCriteria)}`);
+    this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
     
     // Get total count for pagination info
     const total = await this.patientModel.countDocuments(query).exec();

@@ -30,7 +30,7 @@ export class AppService {
     
     for (const payloadDto of payloadDtos) {
       try {
-        const patientId = payloadDto.patientID || (payloadDto.data && payloadDto.data.ID);
+        const patientId = payloadDto.ID;
         
         if (!patientId) {
           throw new Error('Patient ID is required');

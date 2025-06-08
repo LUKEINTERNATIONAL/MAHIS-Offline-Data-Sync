@@ -9,6 +9,7 @@ export class PayloadDto {
   readonly data?: any;
   readonly timestamp?: number;
   readonly patientID?: string;
+  readonly ID?: string;
 }
 
 @Controller()
