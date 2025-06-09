@@ -36,9 +36,41 @@ export class PatientService {
   }
 
   // Update by patientID
-  async updateByPatientId(patientID: string, data: Partial<Patient>): Promise<Patient | null> {
-    return this.patientModel.findOneAndUpdate({ patientID }, data, { new: true }).exec();
+
+// Updated version that can also update nested data fields
+async updateByPatientId(
+  patientID: string,
+  data: Partial<Patient> & {
+    data?: any; // Allow updating nested data object
   }
+): Promise<Patient | null> {
+  const updateQuery: any = {};
+  
+  // Handle top-level field updates
+  Object.keys(data).forEach(key => {
+    if (key === 'data' && data.data) {
+      // Handle nested data object updates
+      Object.keys(data.data).forEach(nestedKey => {
+        updateQuery[`data.${nestedKey}`] = data.data[nestedKey];
+      });
+    } else {
+      // Handle regular top-level field updates
+      updateQuery[key] = data[key];
+    }
+  });
+
+  this.logger.log(`Updating/Creating patient ${patientID} with query:`, updateQuery);
+  
+  return this.patientModel.findOneAndUpdate(
+    { patientID },
+    updateQuery,
+    { 
+      new: true,      // Return the updated document
+      upsert: true,   // Create if document doesn't exist
+      runValidators: true  // Run schema validators on update
+    }
+  ).exec();
+}
 
   // Delete by MongoDB's _id
   async deleteById(id: string): Promise<Patient | null> {
@@ -149,5 +181,90 @@ export class PatientService {
         has_prev: page > 1
       }
     };
+  }
+
+  // Find patients by data.ID, keep the latest, remove duplicates
+  async findAndDeduplicateByDataId(dataId: string): Promise<{
+    keptPatient: Patient | null;
+    removedCount: number;
+    removedPatients: Patient[];
+  }> {
+    try {
+      this.logger.log(`Searching for patients with data.ID: ${dataId}`);
+      
+      // Find all patients with the matching data.ID
+      const patients = await this.patientModel
+        .find({ 'data.ID': dataId })
+        .sort({ createdAt: -1 }) // Sort by createdAt descending (newest first)
+        .exec();
+
+      if (patients.length === 0) {
+        this.logger.log(`No patients found with data.ID: ${dataId}`);
+        return {
+          keptPatient: null,
+          removedCount: 0,
+          removedPatients: []
+        };
+      }
+
+      if (patients.length === 1) {
+        this.logger.log(`Only one patient found with data.ID: ${dataId}, no duplicates to remove`);
+        return {
+          keptPatient: patients[0],
+          removedCount: 0,
+          removedPatients: []
+        };
+      }
+
+      // Keep the first one (most recent due to sorting)
+      const keptPatient = patients[0];
+      const duplicatesToRemove = patients.slice(1);
+
+      this.logger.log(`Found ${patients.length} patients with data.ID: ${dataId}`);
+      this.logger.log(`Keeping patient with _id: ${keptPatient._id} (created: ${keptPatient.createdAt})`);
+      this.logger.log(`Removing ${duplicatesToRemove.length} duplicate(s)`);
+
+      // Remove the duplicates
+      const idsToRemove = duplicatesToRemove.map(p => p._id);
+      const deleteResult = await this.patientModel.deleteMany({
+        _id: { $in: idsToRemove }
+      }).exec();
+
+      this.logger.log(`Successfully removed ${deleteResult.deletedCount} duplicate patients`);
+
+      return {
+        keptPatient: keptPatient,
+        removedCount: deleteResult.deletedCount,
+        removedPatients: duplicatesToRemove
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in findAndDeduplicateByDataId: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  // Alternative version that only finds without removing (for safety/preview)
+  async findDuplicatesByDataId(dataId: string): Promise<{
+    patients: Patient[];
+    latestPatient: Patient | null;
+    duplicateCount: number;
+  }> {
+    try {
+      const patients = await this.patientModel
+        .find({ 'data.ID': dataId })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      return {
+        patients: patients,
+        latestPatient: patients.length > 0 ? patients[0] : null,
+        duplicateCount: Math.max(0, patients.length - 1)
+      };
+
+    } catch (error) {
+      this.logger.error(`Error in findDuplicatesByDataId: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

@@ -318,6 +318,8 @@ async function updatePayload(patient: any, patientService: PatientService, logge
         throw new Error('Patient ID is required');
       }
 
+      patientService.findAndDeduplicateByDataId(patient.ID.toString());
+
       // Use upsert to update if exists, create if doesn't exist
       const result = await patientService.upsert(
         { patientID: patient.ID.toString() }, // Find by patientID

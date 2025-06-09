@@ -77,7 +77,7 @@ export class DataSyncService {
 
           if (responseData) {
             // Update using PatientService by MongoDB _id
-            await this.patientService.updateByPatientId(record.patientID, parsedData);
+            await this.patientService.updateByPatientId(parsedData.ID, parsedData);
             this.ddeService.markAsCompleted(parsedData.ID);
             this.syncGateway.broadcastPatientUpdate(record.patientID, parsedData);
             
@@ -155,7 +155,7 @@ export class DataSyncService {
 
       if (responseData) {
         // Update using PatientService by patientID
-        await this.patientService.updateByPatientId(patientID, {
+        const updatedPatient = await this.patientService.updateByPatientId(responseData.ID, {
           data: responseData,
           message: 'Updated from API response',
           timestamp: Date.now(),
@@ -164,16 +164,13 @@ export class DataSyncService {
         this.syncGateway.broadcastPatientUpdate(patientID, responseData);
         this.ddeService.markAsCompleted(responseData.ID);
 
+        this.logger.log('New Patiend ID: ', responseData.ID);
         this.logger.log(`Successfully synced patient record: ${patientID}`);
-        return {
-          success: true,
-          message: `Successfully synced patient ${patientID}`,
-          patientID,
-          recordId: record._id,
-        };
+
+        return responseData
       }
 
-      return { success: false, message: 'No response data received' };
+      return null;
 
     } catch (error) {
       this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);

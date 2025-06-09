@@ -74,18 +74,28 @@ export class AppService {
               { new: true }
             );
 
-            this.dataSyncService.syncPatientRecord(patientId)
-
-            results.push({
+            const patient_result = await this.dataSyncService.syncPatientRecord(patientId)
+            const resultPayload = {
               success: true,
               message: 'Payload updated successfully',
               id: updatedPatient._id,
               patientID: updatedPatient.patientID,
               timestamp: new Date().toISOString(),
               updated: true,
-              record: updatedPatient.data,
-              hasChanges: hasChanges,
-            });
+              record: patient_result,
+              hasChanges: true,
+              id_to_remove: null,
+            }
+            try {
+              if (patientId.toString() !== patient_result.ID.toString) {
+                this.patientService.deleteByPatientId(patientId.toString());
+                resultPayload.id_to_remove = patientId;
+              }
+            } catch (error) {
+              
+            }
+
+            results.push(resultPayload);
           } catch (e) {
             console.error('Error parsing payload data:', e);
             // throw e;
@@ -99,15 +109,26 @@ export class AppService {
             message: 'Received payload'
           });
 
-          results.push({
+          const patient_result = await this.dataSyncService.syncPatientRecord(patientId)
+          const resultPayload = {
             success: true,
             message: 'Payload received and saved successfully',
             id: newPatient._id,
             patientID: newPatient.data.ID,
             timestamp: new Date().toISOString(),
             updated: false,
-            hasChanges: false,
-          });
+            record: patient_result,
+            hasChanges: true,
+            id_to_remove: null
+          }
+          try {
+            if (patientId.toString() !== patient_result.ID.toString) {
+              this.patientService.deleteByPatientId(patientId.toString());
+              resultPayload.id_to_remove = patientId;
+            }
+          } catch (error) {}
+
+          results.push(resultPayload);
         }
       } catch (error) {
         console.error('Error processing payload:', error);
