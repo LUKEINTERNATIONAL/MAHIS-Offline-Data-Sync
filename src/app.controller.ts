@@ -2,6 +2,7 @@
 import { Controller, Post, Body, Get, Header, Param, NotFoundException, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PatientService } from './modules/patient/patient.service';
+import { DDEService } from './modules/dde/ddde.service';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -16,7 +17,8 @@ export class PayloadDto {
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly patientService: PatientService
+    private readonly patientService: PatientService,
+    private readonly ddeService: DDEService,
   ) {}
 
   @Get()
@@ -49,6 +51,11 @@ export class AppController {
   @Get('test-connection')
   testConnection() {
     return this.appService.testConnection();
+  }
+
+  @Get('unassigned-npid')
+  getUnassignedNpid() {
+    return this.ddeService.findRandomWithNullStatus();
   }
 
   @Get('search')
