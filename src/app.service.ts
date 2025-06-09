@@ -74,9 +74,6 @@ export class AppService {
               { new: true }
             );
 
-            // Trigger WebSocket broadcast
-
-
             this.dataSyncService.syncPatientRecord(patientId)
 
             results.push({

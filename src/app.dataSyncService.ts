@@ -4,6 +4,7 @@ import { PatientService } from './modules/patient/patient.service';
 import { AuthService } from './app.authService';
 import { lastValueFrom } from 'rxjs';
 import { SyncGateway } from './websocket/gateways/sync.gateway';
+import { DDEService } from './modules/dde/ddde.service';
 
 @Injectable()
 export class DataSyncService {
@@ -14,6 +15,7 @@ export class DataSyncService {
     private readonly authService: AuthService,
     private readonly patientService: PatientService,
     private readonly syncGateway: SyncGateway,
+    private readonly ddeService: DDEService,
   ) {}
 
   /**
@@ -76,6 +78,7 @@ export class DataSyncService {
           if (responseData) {
             // Update using PatientService by MongoDB _id
             await this.patientService.updateByPatientId(record.patientID, parsedData);
+            this.ddeService.markAsCompleted(parsedData.ID);
             this.syncGateway.broadcastPatientUpdate(record.patientID, parsedData);
             
             results.successful++;
@@ -159,7 +162,8 @@ export class DataSyncService {
         });
 
         this.syncGateway.broadcastPatientUpdate(patientID, responseData);
-        
+        this.ddeService.markAsCompleted(responseData.ID);
+
         this.logger.log(`Successfully synced patient record: ${patientID}`);
         return {
           success: true,

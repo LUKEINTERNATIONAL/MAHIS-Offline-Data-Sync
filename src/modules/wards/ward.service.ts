@@ -81,7 +81,7 @@ export class WardService {
       }
     } catch (error) {
       console.error('Failed to load wards:', error?.response?.data || error);
-      throw new Error('Could not load wards');
+      // throw new Error('Could not load wards');
     }
   }
 }

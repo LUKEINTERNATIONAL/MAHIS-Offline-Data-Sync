@@ -16,6 +16,7 @@ import { TestResultIndicatorModule } from "./modules/testResultIndicator/test-re
 import { StockModule } from "./modules/stock/stock.module";
 import { RelationshipModule } from "./modules/relationship/relationship.module";
 import { FacilityModule } from "./modules/facilities/facilities.module";
+import { DDEModule } from "./modules/dde/dde.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -43,7 +44,8 @@ async function bootstrap() {
       TestResultIndicatorModule,
       StockModule,
       RelationshipModule,
-      FacilityModule
+      FacilityModule,
+      DDEModule
     ],
     operationIdFactory: (controllerKey: string, methodKey: string) =>
       `${controllerKey}_${methodKey}`,

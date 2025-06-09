@@ -80,7 +80,7 @@ export class ConceptNameService {
         "Error loading concept names:",
         error?.response?.data || error
       );
-      throw new Error("Failed to load concept names.");
+      // throw new Error("Failed to load concept names.");
     }
   }
 }

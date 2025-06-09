@@ -80,7 +80,7 @@ export class FacilityService {
       }
     } catch (error) {
       console.error('Error loading facilities:', error?.response?.data || error);
-      throw new Error('Failed to load facilities.');
+      // throw new Error('Failed to load facilities.');
     }
   }
 }

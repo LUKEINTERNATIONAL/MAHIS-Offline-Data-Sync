@@ -8,6 +8,8 @@ import { User, UserDocument } from '../modules/user/schema/user.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PatientService } from '../modules/patient/patient.service';
+import { DDE4DataSyncService } from './../app.dde4dataSyncService';
+import { DDEService } from '../modules/dde/ddde.service';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -20,6 +22,8 @@ export class DataSyncScheduler implements OnModuleInit {
     private authService: AuthService,
     private readonly httpService: HttpService,
     private readonly patientService: PatientService,
+    private readonly DDE4Service: DDE4DataSyncService,
+    private readonly ddeService: DDEService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {
     // Get configuration from environment variables with defaults
@@ -32,7 +36,6 @@ export class DataSyncScheduler implements OnModuleInit {
    * Implement OnModuleInit to trigger a job 120 seconds after application startup
    */
   async onModuleInit() {
-    this.logger.log('Scheduling initial patient record sync in 120 seconds');
     
     setTimeout(async () => {
       if (this.isEnabled) {
@@ -71,25 +74,27 @@ export class DataSyncScheduler implements OnModuleInit {
    * Perform the actual patient record sync operation
    */
   private async syncPatientRecords() {
+    await this.DDE4Service.getDDEIDSViaExternalAPI();
     await fetchAndSaveUserData(
         this.authService,
         this.userModel,
         this.httpService,
-        this.logger
-      );
+        this.logger,
+    );
     const result = await this.dataSyncService.syncPatientRecords();
     // 	http://localhost:3000/api/v1//patients/6270/get_patient_record
     await syncPatientIds(
         this.authService,
         this.httpService,
         this.logger,
-        this.patientService
+        this.patientService,
+        this.ddeService
       );
     
-    // this.logger.log(`Sync operation completed: ${result.message}`);
-    // // if (result.failed > 0) {
-    // //   this.logger.warn(`${result.failed} records failed to sync`);
-    // // }
+    this.logger.log(`Sync operation completed: ${result.message}`);
+    // if (result.failed > 0) {
+    //   this.logger.warn(`${result.failed} records failed to sync`);
+    // }
     
     return result;
   }
@@ -103,7 +108,7 @@ export class DataSyncScheduler implements OnModuleInit {
       return await this.syncPatientRecords();
     } catch (error) {
       this.logger.error(`Manual sync failed: ${error.message}`, error.stack);
-      throw error;
+      // throw error;
     }
   }
 }

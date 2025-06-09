@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './modules/user/schema/user.schema';
 import { PatientService } from './modules/patient/patient.service';
+import { DDEService } from './modules/dde/ddde.service';
 
 interface AuthResponse {
   authorization: {
@@ -172,7 +173,11 @@ export class AuthService {
  */
 async function fetchAndSaveUserData(authService: AuthService, userModel: Model<UserDocument>, httpService: HttpService, logger: Logger): Promise<User | null> {
   try {
-    await authService.ensureAuthenticated();
+    const isAuthenticated = await authService.ensureAuthenticated();
+    if (!isAuthenticated) {
+      this.logger.error('Failed to authenticate');
+      throw new Error('Failed to authenticate');
+    }
     
     // Get the most recent user
     const user = await userModel.findOne().sort({ id: -1 });
@@ -207,10 +212,11 @@ async function fetchAndSaveUserData(authService: AuthService, userModel: Model<U
 /**
  * Synchronize patient IDs from the server
  */
-async function syncPatientIds(authService: AuthService, httpService: HttpService, logger: Logger, patientService: PatientService): Promise<boolean> {
+async function syncPatientIds(authService: AuthService, httpService: HttpService, logger: Logger, patientService: PatientService, ddeService: DDEService): Promise<boolean> {
   try {
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
+      this.logger.error('Failed to authenticate');
       throw new Error('Failed to authenticate');
     }
 
@@ -231,7 +237,7 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
 
       // console.log('First response:', firstResponse.sync_patients);
       firstResponse.sync_patients.forEach((patient) => {
-          updatePayload(patient, patientService, logger);
+          updatePayload(patient, patientService, logger, ddeService);
       })
 
     if (!firstResponse) return false;
@@ -257,7 +263,7 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
 
       // console.log('First response:', firstResponse.sync_patients);
       response.sync_patients.forEach((patient) => {
-          updatePayload(patient, patientService, logger);
+          updatePayload(patient, patientService, logger, ddeService);
       })
 
       processedPatients += response.sync_patients.length;
@@ -306,7 +312,7 @@ async function makePatientSyncRequest(request: SyncRequest, authService: AuthSer
   }
 }
 
-async function updatePayload(patient: any, patientService: PatientService, logger: Logger): Promise<void> {
+async function updatePayload(patient: any, patientService: PatientService, logger: Logger, ddeService: DDEService): Promise<void> {
     try {
       if (!patient.ID) {
         throw new Error('Patient ID is required');
@@ -326,6 +332,8 @@ async function updatePayload(patient: any, patientService: PatientService, logge
           }
         }
       );
+
+      ddeService.markAsCompleted(patient.ID.toString());
       
       if (result.upsertedCount > 0) {
         logger.log(`Created new patient record for patientID: ${patient.ID}`);

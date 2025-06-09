@@ -86,7 +86,7 @@ export class DiagnosisService {
       }
     } catch (error) {
       console.error("Error loading diagnoses:", error?.response?.data || error);
-      throw new Error("Failed to load diagnoses.");
+      // throw new Error("Failed to load diagnoses.");
     }
   }
 }

@@ -69,7 +69,7 @@ export class StockService {
       }
     } catch (error) {
       console.error("Failed to load stock:", error?.response?.data || error);
-      throw new Error("Could not load stock records");
+      // throw new Error("Could not load stock records");
     }
   }
 }

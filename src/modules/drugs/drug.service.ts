@@ -76,7 +76,7 @@ export class DrugService {
       }
     } catch (error) {
       console.error('Failed to load drugs:', error?.response?.data || error);
-      throw new Error('Could not load drugs.');
+      // throw new Error('Could not load drugs.');
     }
   }
 }

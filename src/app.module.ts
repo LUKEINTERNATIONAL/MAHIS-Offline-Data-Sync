@@ -31,6 +31,8 @@ import { VillageModule } from "./modules/village/village.module";
 import { SpecimenModule } from "./modules/specimen/specimen.module";
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from "./modules/auth/auth.module";
+import { DDE4DataSyncService } from "./app.dde4dataSyncService";
+import { DDEModule } from "./modules/dde/dde.module";
 
 @Module({
   imports: [
@@ -66,7 +68,8 @@ import { AuthModule } from "./modules/auth/auth.module";
     VillageModule,
     SpecimenModule,
     UserModule, 
-    AuthModule
+    AuthModule,
+    DDEModule,
   ],
   controllers: [AppController],
   providers: [
@@ -75,8 +78,9 @@ import { AuthModule } from "./modules/auth/auth.module";
     DataSyncService,
     DataSyncScheduler,
     SyncGateway,
-    LoadDataOnStartService
+    LoadDataOnStartService,
+    DDE4DataSyncService
   ],
-  exports: [AuthService, DataSyncService],
+  exports: [AuthService, DataSyncService, DDE4DataSyncService],
 })
 export class AppModule {}

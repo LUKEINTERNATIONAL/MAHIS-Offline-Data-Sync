@@ -68,7 +68,7 @@ export class TestTypeService {
       }
     } catch (error) {
       console.error("Failed to load test types:", error?.response?.data || error);
-      throw new Error("Could not load test types");
+      // throw new Error("Could not load test types");
     }
   }
 }
