@@ -87,7 +87,7 @@ export class AppService {
               id_to_remove: null,
             }
             try {
-              if (patientId.toString() !== patient_result.ID.toString) {
+              if (patientId.toString() !== patient_result.ID.toString()) {
                 this.patientService.deleteByPatientId(patientId.toString());
                 resultPayload.id_to_remove = patientId;
               }
@@ -122,7 +122,7 @@ export class AppService {
             id_to_remove: null
           }
           try {
-            if (patientId.toString() !== patient_result.ID.toString) {
+            if (patientId.toString() !== patient_result.ID.toString()) {
               this.patientService.deleteByPatientId(patientId.toString());
               resultPayload.id_to_remove = patientId;
             }
