@@ -17,9 +17,35 @@ import { StockModule } from "./modules/stock/stock.module";
 import { RelationshipModule } from "./modules/relationship/relationship.module";
 import { FacilityModule } from "./modules/facilities/facilities.module";
 import { DDEModule } from "./modules/dde/dde.module";
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  let httpsOptions = null;
+
+  // Simple HTTPS setup - only if certificates exist
+  try {
+    const keyPath = path.join(process.cwd(), 'certs', 'key.pem');
+    const certPath = path.join(process.cwd(), 'certs', 'cert.pem');
+
+    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+      httpsOptions = {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
+      };
+      console.log('🔒 HTTPS enabled with SSL certificates');
+    } else {
+      console.log('📄 No SSL certificates found, using HTTP');
+    }
+  } catch (error) {
+    console.log('⚠️  SSL setup error, falling back to HTTP:', error.message);
+  }
+
+  const app = await NestFactory.create(AppModule, { 
+    bodyParser: false,
+    ...(httpsOptions && { httpsOptions })
+  });
+
   app.useGlobalPipes(new ValidationPipe());
   app.setGlobalPrefix("api/v1");
 
@@ -53,7 +79,7 @@ async function bootstrap() {
 
   SwaggerModule.setup("api-docs", app, document);
 
-  /* increase JSON limit to 25 MB */
+  /* increase JSON limit to 25 MB */
   app.use(bodyParser.json({ limit: "25mb" }));
 
   // Enable CORS - allow any origin
@@ -78,10 +104,17 @@ async function bootstrap() {
   }
 
   await app.listen(port_number, "0.0.0.0");
+  
+  const protocol = httpsOptions ? 'https' : 'http';
   console.log(
-    `Application is running on: http://${
+    `🚀 Application is running on: ${protocol}://${
       process.env.HOST || "0.0.0.0"
     }:${port_number}`
   );
+  
+  if (httpsOptions) {
+    console.log('⚠️  Using self-signed certificate - browsers will show security warnings');
+  }
 }
+
 bootstrap();
