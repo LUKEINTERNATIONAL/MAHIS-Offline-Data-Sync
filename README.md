@@ -16,3 +16,7 @@ npm run start:dev
 
 
 for cert generation refer to cert_genaration_step.txt
+
+Make sure you install mongo and is running
+
+Follow the mongo setup via https://www.mongodb.com/docs/manual/installation/
