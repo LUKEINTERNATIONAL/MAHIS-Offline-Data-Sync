@@ -69,7 +69,7 @@ export class DDE4DataSyncService {
             };
         } catch (error) {
             this.logger.error(`DDE id fetch failed: ${error.message}`, error.stack);
-            throw error;
+            // throw error;
         }
     }
 
