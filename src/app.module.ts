@@ -47,7 +47,7 @@ import { DDEModule } from "./modules/dde/dde.module";
     ScheduleModule.forRoot(),
 
     // Database configuration
-    MongooseModule.forRoot("mongodb://localhost:27017/MODS"),
+    MongooseModule.forRoot("mongodb://0.0.0.0:27017/MODS"),
   
     // Register entities
     PatientModule,
