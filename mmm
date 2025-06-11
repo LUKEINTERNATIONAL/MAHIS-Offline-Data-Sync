@@ -1,0 +1,8 @@
+| Command            | What it does                                                       |
+| ------------------ | ------------------------------------------------------------------ |
+| `mkcert -install`  | Creates and installs a trusted local Certificate Authority (CA)    |
+| `mkcert localhost` | Generates trusted `cert.pem` and `key.pem` signed by your local CA |
+
+mkcert local.dev 127.0.0.1 ::1
+
+mkcert offline.mahis 192.168.0.105 localhost 127.0.0.1
