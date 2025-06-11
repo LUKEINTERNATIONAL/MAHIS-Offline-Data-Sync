@@ -77,7 +77,7 @@ export class RelationshipService {
       }
     } catch (error) {
       console.error('Failed to load relationships:', error?.response?.data || error);
-      throw new Error('Could not load relationships');
+      // throw new Error('Could not load relationships');
     }
   }
 }

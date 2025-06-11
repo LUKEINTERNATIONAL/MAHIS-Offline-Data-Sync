@@ -71,7 +71,7 @@ export class ConceptSetService {
       }
     } catch (error) {
       console.error("Error loading concept sets:", error?.response?.data || error);
-      throw new Error("Failed to load concept sets.");
+      // throw new Error("Failed to load concept sets.");
     }
   }
 }

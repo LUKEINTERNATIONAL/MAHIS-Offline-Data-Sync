@@ -6,7 +6,7 @@ import { PayloadDto } from './app.controller';
 import { generateQRCodeDataURL } from './utils/qrcode.util';
 import { getAPIHomePage } from './utils/htmlStr/html_responses';
 import { sophisticatedMergePatientData } from './utils/patient_record_utils';
-import { SyncGateway } from './websocket/gateways/sync.gateway';
+import { DataSyncService } from './app.dataSyncService';
 import { PatientService } from './modules/patient/patient.service';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class AppService {
   constructor(
     @InjectModel(Patient.name)
     private readonly patientModel: Model<PatientDocument>,
-    private readonly syncGateway: SyncGateway,
+    private readonly dataSyncService: DataSyncService,
     private readonly patientService: PatientService,
   ) {}
 
@@ -30,7 +30,7 @@ export class AppService {
     
     for (const payloadDto of payloadDtos) {
       try {
-        const patientId = payloadDto.patientID || (payloadDto.data && payloadDto.data.patientID);
+        const patientId = payloadDto.ID;
         
         if (!patientId) {
           throw new Error('Patient ID is required');
@@ -51,7 +51,7 @@ export class AppService {
             // Parse existing data or use empty object if parsing fails
             let existingData = {};
             try {
-              existingData = existingPatient.data ? JSON.parse(existingPatient.data) : {};
+              existingData = existingPatient.data ? existingPatient.data : {};
             } catch (e) {
               console.log("Existing data was empty or invalid JSON");
             }
@@ -67,48 +67,68 @@ export class AppService {
             const updatedPatient = await this.patientModel.findOneAndUpdate(
               { patientID: patientId },
               { 
-                data: JSON.stringify(result.mergedData),
+                data: result.mergedData,
                 timestamp: payloadDto.timestamp || Date.now(),
                 message: 'Updated payload'
               },
               { new: true }
             );
 
-            // Trigger WebSocket broadcast
-            this.syncGateway.broadcastPatientUpdate(updatedPatient.patientID, result.mergedData);
-
-            results.push({
+            const patient_result = await this.dataSyncService.syncPatientRecord(patientId)
+            const resultPayload = {
               success: true,
               message: 'Payload updated successfully',
               id: updatedPatient._id,
               patientID: updatedPatient.patientID,
               timestamp: new Date().toISOString(),
               updated: true,
-              record: updatedPatient.data,
-              hasChanges: hasChanges,
-            });
+              record: patient_result,
+              hasChanges: true,
+              id_to_remove: null,
+            }
+            try {
+              if (patientId.toString() !== patient_result.ID.toString()) {
+                this.patientService.deleteByPatientId(patientId.toString());
+                resultPayload.id_to_remove = patientId;
+              }
+            } catch (error) {
+              
+            }
+
+            results.push(resultPayload);
           } catch (e) {
             console.error('Error parsing payload data:', e);
-            throw e;
+            // throw e;
           }
         } else {
           // Create new patient record
           const newPatient = await this.patientModel.create({
             patientID: patientId,
-            data: JSON.stringify(payloadDto),
+            data: payloadDto,
             timestamp: payloadDto.timestamp || Date.now(),
             message: 'Received payload'
           });
 
-          results.push({
+          const patient_result = await this.dataSyncService.syncPatientRecord(patientId)
+          const resultPayload = {
             success: true,
             message: 'Payload received and saved successfully',
             id: newPatient._id,
-            patientID: newPatient.patientID,
+            patientID: newPatient.data.ID,
             timestamp: new Date().toISOString(),
             updated: false,
-            hasChanges: false,
-          });
+            record: patient_result,
+            hasChanges: true,
+            id_to_remove: null
+          }
+          try {
+            if (patientId.toString() !== patient_result.ID.toString()) {
+              this.patientService.deleteByPatientId(patientId.toString());
+              resultPayload.id_to_remove = patientId;
+            }
+          } catch (error) {}
+
+          results.push(resultPayload);
         }
       } catch (error) {
         console.error('Error processing payload:', error);
@@ -142,5 +162,9 @@ export class AppService {
       connection_status: 'available',
       timestamp: new Date().toISOString()
     };
+  }
+
+  async savePatientRecordToAPI(record: any) {
+
   }
 }

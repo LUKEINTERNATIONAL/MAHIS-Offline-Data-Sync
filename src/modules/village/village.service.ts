@@ -81,7 +81,7 @@ export class VillageService {
       }
     } catch (error) {
       console.error('Failed to load villages:', error?.response?.data || error);
-      throw new Error('Could not load villages');
+      // throw new Error('Could not load villages');
     }
   }
 }

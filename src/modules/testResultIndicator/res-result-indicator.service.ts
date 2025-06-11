@@ -109,7 +109,7 @@ export class TestResultIndicatorService {
         "Failed to load indicators:",
         error?.response?.data || error
       );
-      throw new Error("Could not load test result indicators");
+      // throw new Error("Could not load test result indicators");
     }
   }
 }

@@ -2,23 +2,23 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Document, Schema as MongooseSchema } from 'mongoose';
 import { Types } from 'mongoose';
 
-export type PatientDocument = HydratedDocument<Patient>;
+export type DDEDocument = HydratedDocument<DDE>;
+
+// Define the status enum for type safety
+export enum DDEStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed'
+}
 
 @Schema({
   timestamps: true,
-  collection: 'patients'
+  collection: 'dde'
 })
-export class Patient extends Document {
+export class DDE extends Document {
   _id: Types.ObjectId;
-
-  @Prop({ required: true })
-  message: string;
 
   @Prop({ type: MongooseSchema.Types.Mixed })
   data: any; // Can store any JSON object
-
-  @Prop({ type: Number })
-  timestamp: number;
 
   @Prop({
     required: true,
@@ -26,10 +26,18 @@ export class Patient extends Document {
     sparse: true,
     index: true
   })
-  patientID: string;
+  npid: string;
+  
+
+  @Prop({
+    type: String,
+    enum: Object.values(DDEStatus),
+    default: null // Set to null initially as requested
+  })
+  status: DDEStatus | null;
 
   @Prop({ default: Date.now })
   createdAt: Date;
 }
 
-export const PatientSchema = SchemaFactory.createForClass(Patient);
+export const DDESchema = SchemaFactory.createForClass(DDE);

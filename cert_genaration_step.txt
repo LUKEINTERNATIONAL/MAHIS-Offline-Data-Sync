@@ -1,0 +1,31 @@
+
+step 1:  make sure you install, mkcert with the below command on linux
+
+sudo apt install libnss3-tools
+curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
+chmod +x mkcert-v*-linux-amd64
+sudo mv mkcert-v*-linux-amd64 /usr/local/bin/mkcert
+
+
+step 2: run the below command command
+mkcert -install
+
+step 3: generating certs for MODS  (replace the below ip with the device ip used on the LAN)
+
+mkcert offline.mahis 192.168.0.105 localhost 127.0.0.1
+
+step 4:
+
+ replace the certs in certs dir with the genarated above, to cert.pem, and key.pem
+
+ e.g offline.mahis+3-key.pem to key.pem
+     offline.mahis+3.pem to cert.pem
+
+     make sure you place the keys in cert dir
+
+
+step 5: run the below command to get dir for rootCA.pem
+
+    mkcert -CAROOT
+
+step 6: transfer the above to your androind device and import the key in androind allowed keys

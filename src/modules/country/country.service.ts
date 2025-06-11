@@ -79,7 +79,7 @@ export class CountryService {
       }
     } catch (error) {
       console.error('Failed to load countries:', error?.response?.data || error);
-      throw new Error('Could not load countries');
+      // throw new Error('Could not load countries');
     }
   }
   

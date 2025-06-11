@@ -1,6 +1,8 @@
 // app.controller.ts
-import { Controller, Post, Body, Get, Header, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, Param, NotFoundException, Query } from '@nestjs/common';
 import { AppService } from './app.service';
+import { PatientService } from './modules/patient/patient.service';
+import { DDEService } from './modules/dde/ddde.service';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -8,11 +10,16 @@ export class PayloadDto {
   readonly data?: any;
   readonly timestamp?: number;
   readonly patientID?: string;
+  readonly ID?: string;
 }
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly patientService: PatientService,
+    private readonly ddeService: DDEService,
+  ) {}
 
   @Get()
   @Header('Content-Type', 'text/html')
@@ -38,11 +45,39 @@ export class AppController {
     if (!payload) {
       throw new NotFoundException(`Payload not found for patient ID ${patientId}`);
     }
-    return JSON.parse(payload.data);
+    return payload.data;
   }
 
   @Get('test-connection')
   testConnection() {
     return this.appService.testConnection();
+  }
+
+  @Get('unassigned-npid')
+  getUnassignedNpid() {
+    return this.ddeService.findRandomWithNullStatus();
+  }
+
+  @Get('search')
+  async searchPatients(
+    @Query('given_name') given_name?: string,
+    @Query('family_name') family_name?: string,
+    @Query('gender') gender?: string,
+    @Query('page') page?: string,
+    @Query('per_page') per_page?: string,
+  ) {
+    const searchCriteria = { given_name, family_name, gender };
+    
+    // Remove undefined values
+    Object.keys(searchCriteria).forEach(key => 
+      searchCriteria[key] === undefined && delete searchCriteria[key]
+    );
+    
+    const pagination = {
+      page: page ? parseInt(page, 10) : 1,
+      per_page: per_page ? parseInt(per_page, 10) : 10
+    };
+    
+    return this.patientService.searchPatientData(searchCriteria, pagination);
   }
 }

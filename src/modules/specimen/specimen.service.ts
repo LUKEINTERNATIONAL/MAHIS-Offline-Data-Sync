@@ -69,7 +69,7 @@ export class SpecimenService {
       }
     } catch (error) {
       console.error("Failed to load specimen:", error?.response?.data || error);
-      throw new Error("Could not load specimen records");
+      // throw new Error("Could not load specimen records");
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Put, Delete, Query } from '@nestjs/common';
 import { PatientService } from './patient.service';
 import { Patient } from './schema/patient.schema';
 

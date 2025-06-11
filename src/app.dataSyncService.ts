@@ -3,7 +3,8 @@ import { HttpService } from '@nestjs/axios';
 import { PatientService } from './modules/patient/patient.service';
 import { AuthService } from './app.authService';
 import { lastValueFrom } from 'rxjs';
-import { Types } from 'mongoose';
+import { SyncGateway } from './websocket/gateways/sync.gateway';
+import { DDEService } from './modules/dde/ddde.service';
 
 @Injectable()
 export class DataSyncService {
@@ -13,6 +14,8 @@ export class DataSyncService {
     private readonly httpService: HttpService,
     private readonly authService: AuthService,
     private readonly patientService: PatientService,
+    private readonly syncGateway: SyncGateway,
+    private readonly ddeService: DDEService,
   ) {}
 
   /**
@@ -49,7 +52,7 @@ export class DataSyncService {
           let parsedData: any = {};
           try {
             if (record.data) {
-              parsedData = JSON.parse(record.data);
+              parsedData = record.data;
             }
           } catch (parseError) {
             this.logger.warn(`Failed to parse data for record ID ${record._id.toString()}: ${parseError.message}`);
@@ -58,7 +61,7 @@ export class DataSyncService {
           const syncPayload = {
             record: {
               ...parsedData,
-              patientID: record.patientID, // Explicitly include patientID
+              patientID: parsedData.ID, // Explicitly include patientID
               timestamp: record.timestamp,
             }
           };
@@ -74,18 +77,16 @@ export class DataSyncService {
 
           if (responseData) {
             // Update using PatientService by MongoDB _id
-            await this.patientService.updateById(record._id.toString(), {
-              data: JSON.stringify(responseData),
-              message: 'Updated from API response',
-              timestamp: Date.now(),
-            });
+            await this.patientService.updateByPatientId(parsedData.ID, parsedData);
+            this.ddeService.markAsCompleted(parsedData.ID);
+            this.syncGateway.broadcastPatientUpdate(record.patientID, parsedData);
             
             results.successful++;
             results.updatedRecords.push(record._id);
           }
 
         } catch (syncError) {
-          this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
+          // this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
           results.failed++;
           results.errors.push({
             recordId: record._id.toString(),
@@ -103,7 +104,7 @@ export class DataSyncService {
       };
     } catch (error) {
       this.logger.error(`Patient record sync failed: ${error.message}`, error.stack);
-      throw error;
+      // throw error;
     }
   }
 
@@ -130,7 +131,7 @@ export class DataSyncService {
       let parsedData: any = {};
       try {
         if (record.data) {
-          parsedData = JSON.parse(record.data);
+          parsedData = record.data;
         }
       } catch (parseError) {
         this.logger.warn(`Failed to parse data for patientID ${patientID}: ${parseError.message}`);
@@ -139,7 +140,6 @@ export class DataSyncService {
       const syncPayload = {
         record: {
           ...parsedData,
-          patientID: record.patientID,
           timestamp: record.timestamp,
         }
       };
@@ -155,26 +155,26 @@ export class DataSyncService {
 
       if (responseData) {
         // Update using PatientService by patientID
-        await this.patientService.updateByPatientId(patientID, {
-          data: JSON.stringify(responseData),
+        const updatedPatient = await this.patientService.updateByPatientId(responseData.ID, {
+          data: responseData,
           message: 'Updated from API response',
           timestamp: Date.now(),
         });
-        
+
+        this.syncGateway.broadcastPatientUpdate(patientID, responseData);
+        this.ddeService.markAsCompleted(responseData.ID);
+
+        this.logger.log('New Patiend ID: ', responseData.ID);
         this.logger.log(`Successfully synced patient record: ${patientID}`);
-        return {
-          success: true,
-          message: `Successfully synced patient ${patientID}`,
-          patientID,
-          recordId: record._id,
-        };
+
+        return responseData
       }
 
-      return { success: false, message: 'No response data received' };
+      return null;
 
     } catch (error) {
       this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
-      throw error;
+      // throw error;
     }
   }
 

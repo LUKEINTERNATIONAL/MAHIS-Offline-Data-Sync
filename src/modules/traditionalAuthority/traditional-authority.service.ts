@@ -81,7 +81,7 @@ export class TraditionalAuthorityService {
       }
     } catch (error) {
       console.error('Failed to load traditional authorities:', error?.response?.data || error);
-      throw new Error('Could not load traditional authorities');
+      // throw new Error('Could not load traditional authorities');
     }
   }
 }
