@@ -1,22 +1,51 @@
-# MAHIS-Offline-Data-Sync
-Copy and edit .env.example to .env and place in the below settings (make use API_USERNAME is associated with the facility, to be pulling patients for that facility)
+# MAHIS Offline Data Sync
 
-The settings in .env 
+## Setup Instructions
 
-Make usre the base_url cotainns /api/v1
+1. **Configure Environment Variables**
 
-API_BASE_URL=http://mahistest.health.gov.mw/api/v1/
-API_USERNAME=Kayeye
-API_PASSWORD=Kasongo@2025
+   - Copy `.env.example` to `.env`.
+   - Edit the `.env` file with the following settings:
 
+     ```
+     API_BASE_URL=http://mahistest.health.gov.mw/api/v1/
+     API_USERNAME=Kayeye
+     API_PASSWORD=Kasongo@2025
+     ```
 
-Run the app via: 
+   - **Note:** Make sure `API_USERNAME` is associated with the facility whose patient data should be pulled.
+   - Ensure `API_BASE_URL` includes `/api/v1` at the end.
 
-npm run start:dev
+2. **Run the Application**
 
+   ```
+   npm run start:dev
+   ```
 
-for cert generation refer to cert_genaration_step.txt
+3. **Generate SSL Certificates**
 
-Make sure you install mongo and is running
+   - Follow the steps in `cert_generation_step.txt` for certificate generation.
 
-Follow the mongo setup via https://www.mongodb.com/docs/manual/installation/
+4. **Install MongoDB**
+
+   - MongoDB must be installed and running.
+   - Refer to the official MongoDB installation guide:
+     [MongoDB Manual Installation](https://www.mongodb.com/docs/manual/installation/)
+
+5. **Install mkcert**
+
+   - `mkcert` is required to generate local trusted certificates.
+   - Installation guide:
+     [mkcert GitHub Repository](https://github.com/FiloSottile/mkcert)
+
+6. **Set Up SSL Certificates**
+
+   ```
+   ./setup_mods_ssl.sh
+   ```
+
+7. **Install Certificate on Android**
+
+   - Go to:
+     `Settings > Security > Encryption & credentials > Install a certificate > CA`
+   - Select the file: `rootCA.pem`
