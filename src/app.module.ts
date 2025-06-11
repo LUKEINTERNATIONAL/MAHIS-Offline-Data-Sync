@@ -33,6 +33,7 @@ import { UserModule } from './modules/user/user.module';
 import { AuthModule } from "./modules/auth/auth.module";
 import { DDE4DataSyncService } from "./app.dde4dataSyncService";
 import { DDEModule } from "./modules/dde/dde.module";
+import { ServerPatientCountModule } from "./modules/serverPatientCount/server-patient-count.module";
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { DDEModule } from "./modules/dde/dde.module";
     UserModule, 
     AuthModule,
     DDEModule,
+    ServerPatientCountModule,
   ],
   controllers: [AppController],
   providers: [

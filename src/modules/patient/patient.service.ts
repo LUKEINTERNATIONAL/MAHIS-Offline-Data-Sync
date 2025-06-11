@@ -110,7 +110,7 @@ async updateByPatientId(
     searchCriteria: { 
       given_name?: string; 
       family_name?: string; 
-      gender?: string 
+      gender?: string;
     },
     pagination: {
       page?: number;
@@ -129,11 +129,32 @@ async updateByPatientId(
   }> {
     const query: any = {};
     
+    // Intelligent given_name search
     if (searchCriteria.given_name) {
-      query['data.personInformation.given_name'] = {
-        $regex: `^${searchCriteria.given_name}`,
-        $options: 'i'
-      };
+      const givenNameInput = searchCriteria.given_name.toString().trim();
+      
+      // Check if the given_name input is entirely numeric
+      const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
+      
+      if (isEntirelyNumeric) {
+        // Search by NcdID number pattern
+        // Match records where NcdID ends with "-{number}"
+        // Example: "SA-NCD-1", "DIFFERENT-PREFIX-123", etc.
+        query['data.NcdID'] = {
+          $regex: `-${givenNameInput}$`,
+          $options: 'i'
+        };
+        
+        this.logger.log(`Numeric given_name search detected: searching for NcdID ending with -${givenNameInput}`);
+      } else {
+        // Text search on given_name (existing behavior)
+        query['data.personInformation.given_name'] = {
+          $regex: `^${givenNameInput}`,
+          $options: 'i'
+        };
+        
+        this.logger.log(`Text given_name search detected: searching given_name starting with ${givenNameInput}`);
+      }
     }
     
     if (searchCriteria.family_name) {
@@ -154,8 +175,9 @@ async updateByPatientId(
     const page = pagination.page || 1;
     const per_page = pagination.per_page || 10;
     const skip = (page - 1) * per_page;
-
+    
     this.logger.log(`Search criteria: ${JSON.stringify(searchCriteria)}`);
+    this.logger.log(`Generated query: ${JSON.stringify(query)}`);
     this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
     
     // Get total count for pagination info

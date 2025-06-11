@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ---- SETTINGS ----
-DEVICE_IP="192.168.76.148"  # <- Replace with your device's actual IP
+DEVICE_IP="192.168.0.105"  # <- Replace with your device's actual IP
 CERT_DIR="./certs"
 
 # ---- Step 1: Check if mkcert is installed ----

@@ -8,6 +8,7 @@ import { Model } from 'mongoose';
 import { User, UserDocument } from './modules/user/schema/user.schema';
 import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
+import { ServerPatientCount, ServerPatientCountDocument } from './modules/serverPatientCount/schema/server-patient-count.schema';
 
 interface AuthResponse {
   authorization: {
@@ -209,6 +210,91 @@ async function fetchAndSaveUserData(authService: AuthService, userModel: Model<U
   }
 }
 
+async function updateIfSitePatientCountChanges(
+  authService: AuthService, 
+  httpService: HttpService, 
+  logger: Logger,
+  serverPatientCountModel: Model<ServerPatientCountDocument>,
+  fnToCall: Function
+) {
+  try {
+    const isAuthenticated = await authService.ensureAuthenticated();
+    if (!isAuthenticated) {
+      logger.error('Failed to authenticate');
+      throw new Error('Failed to authenticate');
+    }
+
+    const initialRequest: SyncRequest = {
+      previous_sync_date: "",
+      page: 1,
+      page_size: 1
+    };
+
+    const response = await makePatientSyncRequest(initialRequest, authService, httpService, logger);
+
+    if (!response) return false;
+
+    const serverPatientCount = response.server_patient_count;
+
+    // Get all records and ensure only one exists
+    const allRecords = await serverPatientCountModel.find({}).sort({ _id: -1 }); // Sort by newest first
+    
+    let storedPatientCount;
+    
+    if (allRecords.length === 0) {
+      // No records exist, create one
+      storedPatientCount = new serverPatientCountModel({ 
+        id: 1, 
+        server_patient_count: 0 
+      });
+      await storedPatientCount.save();
+    } else if (allRecords.length === 1) {
+      // Only one record exists, use it
+      storedPatientCount = allRecords[0];
+    } else {
+      // Multiple records exist, keep the latest and delete the rest
+      logger.warn(`Found ${allRecords.length} patient count records, cleaning up to keep only the latest`);
+      
+      storedPatientCount = allRecords[0]; // Latest record (newest first due to sort)
+      const recordsToDelete = allRecords.slice(1); // All except the first (latest)
+      
+      // Delete all old records
+      for (const record of recordsToDelete) {
+        await serverPatientCountModel.deleteOne({ _id: record._id });
+      }
+      
+      // Update the kept record to have id: 1 for consistency
+      storedPatientCount.id = 1;
+      await storedPatientCount.save();
+      
+      logger.log(`Cleaned up ${recordsToDelete.length} duplicate patient count records`);
+    }
+
+    // Check if server count differs from stored count
+    if (serverPatientCount !== storedPatientCount.server_patient_count) {
+      logger.log(`Patient count changed: ${storedPatientCount.server_patient_count} -> ${serverPatientCount}`);
+      
+      // Call the passed function
+      // await fnToCall();
+      fnToCall();
+      
+      // Update the local value in MongoDB
+      storedPatientCount.server_patient_count = serverPatientCount;
+      await storedPatientCount.save();
+      
+      logger.log('Local patient count updated successfully');
+      return true;
+    }
+
+    logger.log('Patient count unchanged');
+    return false;
+
+  } catch (error) {
+    logger.error('Error in updateIfSitePatientCountChanges:', error);
+    // throw error;
+  }
+}
+
 /**
  * Synchronize patient IDs from the server
  */
@@ -235,12 +321,12 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
     // Make the first request to get total count
     const firstResponse = await makePatientSyncRequest(initialRequest, authService, httpService, logger);
 
-      // console.log('First response:', firstResponse.sync_patients);
-      firstResponse.sync_patients.forEach((patient) => {
-          updatePayload(patient, patientService, logger, ddeService);
-      })
-
     if (!firstResponse) return false;
+
+    // console.log('First response:', firstResponse.sync_patients);
+    firstResponse.sync_patients.forEach((patient) => {
+        updatePayload(patient, patientService, logger, ddeService);
+    })
 
     totalPatients = firstResponse.server_patient_count;
     processedPatients += firstResponse.sync_patients.length;
@@ -349,4 +435,4 @@ async function updatePayload(patient: any, patientService: PatientService, logge
   }
 
 // Export the standalone functions for use elsewhere
-export { fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload };
+export { fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges };
