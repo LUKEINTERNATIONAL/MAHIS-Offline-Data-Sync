@@ -178,6 +178,34 @@ export class DataSyncService {
     }
   }
 
+  async syncPatientRecordWithPayload(syncPayload: any) {
+    try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
+
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+
+      this.logger.log("syncPayload :", syncPayload);
+
+      const { data: responseData } = await lastValueFrom(
+        this.httpService.post(saveUrl, syncPayload, {
+          headers: {
+            Authorization: this.authService.getAuthToken(),
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      return responseData;
+
+    } catch (error) {
+      this.logger.error(`Failed to sync patient record: ${error.message}`);
+      // throw error;
+    }
+    }
+
   /**
    * Get sync status for all patients
    */

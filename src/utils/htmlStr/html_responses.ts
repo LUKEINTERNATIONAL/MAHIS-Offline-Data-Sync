@@ -8,7 +8,7 @@ export const getAPIHomePage = (
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>MAHIS Offline Data Sync API</title>
+      <title>MAHIS Offline Data Sync(MODS)</title>
       <style>
         /* Layout */
         :root {
@@ -125,7 +125,7 @@ export const getAPIHomePage = (
     </head>
     <body>
       <div class="container">
-        <h1>MAHIS Offline Data Sync API</h1>
+        <h1>MAHIS Offline Data Sync (MODS)</h1>
         <p class="subtitle">Secure data synchronization service</p>
         <div class="status">✓ Active</div>
   

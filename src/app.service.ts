@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Patient, PatientDocument } from './modules/patient/schema/patient.schema';
@@ -11,6 +11,7 @@ import { PatientService } from './modules/patient/patient.service';
 
 @Injectable()
 export class AppService {
+   private readonly logger = new Logger(DataSyncService.name);
   constructor(
     @InjectModel(Patient.name)
     private readonly patientModel: Model<PatientDocument>,
@@ -33,7 +34,34 @@ export class AppService {
         const patientId = payloadDto.ID;
         
         if (!patientId) {
-          throw new Error('Patient ID is required');
+          try {
+            const newPatientFromPayload = await this.dataSyncService.syncPatientRecordWithPayload(payloadDto)
+
+            // Create new patient record
+            const newPatient = await this.patientModel.create({
+              patientID: newPatientFromPayload.ID,
+              data: newPatientFromPayload,
+              timestamp: payloadDto.timestamp || Date.now(),
+              message: 'Received payload'
+            });
+
+            const resultPayload = {
+              success: true,
+              message: 'Payload updated successfully',
+              id: null,
+              patientID: newPatientFromPayload.ID,
+              timestamp: new Date().toISOString(),
+              updated: true,
+              record: newPatientFromPayload,
+              hasChanges: true,
+              id_to_remove: null,
+            }
+
+            return [resultPayload];
+          } catch (error) {
+            this.logger.error(`Failed to sync patient record: ${error.message}`);     }
+
+          // throw new Error('Patient ID is required');
         }
 
         // Check if patient record already exists
@@ -53,7 +81,7 @@ export class AppService {
             try {
               existingData = existingPatient.data ? existingPatient.data : {};
             } catch (e) {
-              console.log("Existing data was empty or invalid JSON");
+              this.logger.error("Existing data was empty or invalid JSON");
             }
           
             // If existing data is empty, use new data directly
@@ -97,7 +125,7 @@ export class AppService {
 
             results.push(resultPayload);
           } catch (e) {
-            console.error('Error parsing payload data:', e);
+            this.logger.error('Error parsing payload data:', e);
             // throw e;
           }
         } else {
@@ -131,7 +159,7 @@ export class AppService {
           results.push(resultPayload);
         }
       } catch (error) {
-        console.error('Error processing payload:', error);
+        this.logger.error('Error processing payload:', error);
         results.push({
           success: false,
           message: 'Error processing payload',
