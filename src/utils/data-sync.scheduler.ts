@@ -11,6 +11,7 @@ import { PatientService } from '../modules/patient/patient.service';
 import { DDE4DataSyncService } from './../app.dde4dataSyncService';
 import { DDEService } from '../modules/dde/ddde.service';
 import { ServerPatientCount, ServerPatientCountDocument } from '../modules/serverPatientCount/schema/server-patient-count.schema';
+import { VisitAndStagesSyncService } from './../app.VisitAndStagesSyncService';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -25,6 +26,7 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly patientService: PatientService,
     private readonly DDE4Service: DDE4DataSyncService,
     private readonly ddeService: DDEService,
+    private readonly visitAndStagesSyncService: VisitAndStagesSyncService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(ServerPatientCount.name) private readonly serverPatientCountModel: Model<ServerPatientCountDocument>,
   ) {
@@ -115,8 +117,11 @@ async checkPatientCountChanges() {
         this.patientService,
         this.ddeService
       );
+    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+
     
     this.logger.log(`Sync operation completed: ${result.message}`);
+
     // if (result.failed > 0) {
     //   this.logger.warn(`${result.failed} records failed to sync`);
     // }

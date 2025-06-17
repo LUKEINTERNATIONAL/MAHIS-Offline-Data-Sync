@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Stage, StageDocument } from './schema/stage.schema';
@@ -21,26 +21,26 @@ export interface StageQueryOptions {
 
 @Injectable()
 export class StageService {
+  private readonly Stagelogger = new Logger(StageService.name);
   constructor(
     @InjectModel(Stage.name) private stageModel: Model<StageDocument>
   ) {}
 
-  // Create a new stage
+  // Create a new stage or update if exists
   async create(createStageDto: CreateStageDto): Promise<Stage> {
     try {
       // Check if stage with same id already exists
       const existingStage = await this.stageModel.findOne({ id: createStageDto.id });
       if (existingStage) {
-        throw new BadRequestException(`Stage with id ${createStageDto.id} already exists`);
+        this.Stagelogger.warn(`Stage with id ${createStageDto.id} already exists, updating instead`);
+        return await this.updateByStageId(createStageDto.id, createStageDto);
       }
 
       const createdStage = new this.stageModel(createStageDto);
       return await createdStage.save();
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to create stage');
+      this.Stagelogger.error(`Failed to create stage: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -63,7 +63,8 @@ export class StageService {
 
       return await query.exec();
     } catch (error) {
-      throw new BadRequestException('Failed to fetch stages');
+      this.Stagelogger.error(`Failed to fetch stages: ${error.message}`, error.stack);
+      return [];
     }
   }
 
@@ -72,14 +73,13 @@ export class StageService {
     try {
       const stage = await this.stageModel.findById(id);
       if (!stage) {
-        throw new NotFoundException(`Stage with ID ${id} not found`);
+        this.Stagelogger.warn(`Stage with ID ${id} not found`);
+        return null;
       }
       return stage;
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException('Invalid stage ID format');
+      this.Stagelogger.error(`Failed to find stage by ID ${id}: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -88,14 +88,13 @@ export class StageService {
     try {
       const stage = await this.stageModel.findOne({ id: stageId });
       if (!stage) {
-        throw new NotFoundException(`Stage with stage ID ${stageId} not found`);
+        this.Stagelogger.warn(`Stage with stage ID ${stageId} not found`);
+        return null;
       }
       return stage;
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to find stage');
+      this.Stagelogger.error(`Failed to find stage by stage ID ${stageId}: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -109,7 +108,8 @@ export class StageService {
           _id: { $ne: id }
         });
         if (existingStage) {
-          throw new BadRequestException(`Stage with id ${updateStageDto.id} already exists`);
+          this.Stagelogger.warn(`Stage with id ${updateStageDto.id} already exists, skipping update`);
+          return existingStage;
         }
       }
 
@@ -120,15 +120,14 @@ export class StageService {
       );
 
       if (!updatedStage) {
-        throw new NotFoundException(`Stage with ID ${id} not found`);
+        this.Stagelogger.warn(`Stage with ID ${id} not found for update`);
+        return null;
       }
 
       return updatedStage;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to update stage');
+      this.Stagelogger.error(`Failed to update stage by ID ${id}: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -139,7 +138,8 @@ export class StageService {
       if (updateStageDto.id !== undefined && updateStageDto.id !== stageId) {
         const existingStage = await this.stageModel.findOne({ id: updateStageDto.id });
         if (existingStage) {
-          throw new BadRequestException(`Stage with id ${updateStageDto.id} already exists`);
+          this.Stagelogger.warn(`Stage with id ${updateStageDto.id} already exists, skipping update`);
+          return existingStage;
         }
       }
 
@@ -150,15 +150,14 @@ export class StageService {
       );
 
       if (!updatedStage) {
-        throw new NotFoundException(`Stage with stage ID ${stageId} not found`);
+        this.Stagelogger.warn(`Stage with stage ID ${stageId} not found for update`);
+        return null;
       }
 
       return updatedStage;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to update stage');
+      this.Stagelogger.error(`Failed to update stage by stage ID ${stageId}: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -167,14 +166,13 @@ export class StageService {
     try {
       const deletedStage = await this.stageModel.findByIdAndDelete(id);
       if (!deletedStage) {
-        throw new NotFoundException(`Stage with ID ${id} not found`);
+        this.Stagelogger.warn(`Stage with ID ${id} not found for deletion`);
+        return null;
       }
       return deletedStage;
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to delete stage');
+      this.Stagelogger.error(`Failed to delete stage by ID ${id}: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -183,14 +181,13 @@ export class StageService {
     try {
       const deletedStage = await this.stageModel.findOneAndDelete({ id: stageId });
       if (!deletedStage) {
-        throw new NotFoundException(`Stage with stage ID ${stageId} not found`);
+        this.Stagelogger.warn(`Stage with stage ID ${stageId} not found for deletion`);
+        return null;
       }
       return deletedStage;
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to delete stage');
+      this.Stagelogger.error(`Failed to delete stage by stage ID ${stageId}: ${error.message}`, error.stack);
+      return null;
     }
   }
 
@@ -199,7 +196,8 @@ export class StageService {
     try {
       return await this.stageModel.countDocuments();
     } catch (error) {
-      throw new BadRequestException('Failed to count stages');
+      this.Stagelogger.error(`Failed to count stages: ${error.message}`, error.stack);
+      return 0;
     }
   }
 
@@ -209,7 +207,8 @@ export class StageService {
       const stage = await this.stageModel.findOne({ id: stageId }).select('_id');
       return !!stage;
     } catch (error) {
-      throw new BadRequestException('Failed to check stage existence');
+      this.Stagelogger.error(`Failed to check stage existence for ID ${stageId}: ${error.message}`, error.stack);
+      return false;
     }
   }
 
@@ -236,34 +235,61 @@ export class StageService {
         totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      throw new BadRequestException('Failed to fetch paginated stages');
+      this.Stagelogger.error(`Failed to fetch paginated stages: ${error.message}`, error.stack);
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0
+      };
     }
   }
 
   // Bulk operations
   async createMany(stages: CreateStageDto[]): Promise<Stage[]> {
-        try {
-        // Check for duplicate stage IDs
-        const stageIds = stages.map(s => s.id);
-        const duplicates = stageIds.filter((id, index) => stageIds.indexOf(id) !== index);
-        if (duplicates.length > 0) {
-            throw new BadRequestException(`Duplicate stage IDs found: ${duplicates.join(', ')}`);
-        }
-
-        // Check if any stage IDs already exist in database
-        const existingStages = await this.stageModel.find({ id: { $in: stageIds } });
-        if (existingStages.length > 0) {
-            const existingIds = existingStages.map(s => s.id);
-            throw new BadRequestException(`Stages with IDs already exist: ${existingIds.join(', ')}`);
-        }
-
-        const createdStages = await this.stageModel.insertMany(stages);
-        return createdStages as any;
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
+    try {
+      // Check for duplicate stage IDs
+      const stageIds = stages.map(s => s.id);
+      const duplicates = stageIds.filter((id, index) => stageIds.indexOf(id) !== index);
+      if (duplicates.length > 0) {
+        this.Stagelogger.warn(`Duplicate stage IDs found: ${duplicates.join(', ')}, skipping duplicates`);
+        // Filter out duplicates
+        const uniqueStages = stages.filter((stage, index, self) => 
+          index === self.findIndex(s => s.id === stage.id)
+        );
+        stages = uniqueStages;
       }
-      throw new BadRequestException('Failed to create multiple stages');
+
+      // Check if any stage IDs already exist in database
+      const existingStages = await this.stageModel.find({ id: { $in: stageIds } });
+      if (existingStages.length > 0) {
+        const existingIds = existingStages.map(s => s.id);
+        this.Stagelogger.warn(`Stages with IDs already exist: ${existingIds.join(', ')}, updating existing ones`);
+        
+        // Separate new and existing stages
+        const newStages = stages.filter(stage => !existingIds.includes(stage.id));
+        const existingStageUpdates = stages.filter(stage => existingIds.includes(stage.id));
+        
+        // Update existing stages
+        const updatePromises = existingStageUpdates.map(stage => 
+          this.updateByStageId(stage.id, stage)
+        );
+        
+        // Create new stages and update existing ones
+        const [createdStages, updatedStages] = await Promise.all([
+          newStages.length > 0 ? this.stageModel.insertMany(newStages) : Promise.resolve([]),
+          Promise.all(updatePromises)
+        ]);
+        
+        return [...(createdStages as Stage[]), ...updatedStages.filter(s => s !== null)];
+      }
+
+      const createdStages = await this.stageModel.insertMany(stages);
+      return createdStages as Stage[];
+    } catch (error) {
+      this.Stagelogger.error(`Failed to create multiple stages: ${error.message}`, error.stack);
+      return [];
     }
   }
 
@@ -272,7 +298,8 @@ export class StageService {
       const result = await this.stageModel.deleteMany({ id: { $in: stageIds } });
       return { deletedCount: result.deletedCount };
     } catch (error) {
-      throw new BadRequestException('Failed to delete multiple stages');
+      this.Stagelogger.error(`Failed to delete multiple stages: ${error.message}`, error.stack);
+      return { deletedCount: 0 };
     }
   }
 }

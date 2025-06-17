@@ -38,6 +38,7 @@ import { VisitModule } from "./modules/visit/visit.module";
 import { VisitService } from "./modules/visit/visit.service";
 import { StageModule } from "./modules/stage/stage.module";
 import { StageService } from "./modules/stage/stage.service";
+import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { StageService } from "./modules/stage/stage.service";
     DDE4DataSyncService,
     VisitService,
     StageService,
+    VisitAndStagesSyncService,
   ],
   exports: [AuthService, DataSyncService, DDE4DataSyncService],
 })
