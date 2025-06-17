@@ -43,13 +43,16 @@ export class VisitAndStagesSyncService {
 
             if (responseData) {
                 function transformStageData(flatStages: any[]): any[] {
-                return flatStages.map(stage => {
+                    return flatStages.map(stage => {
                     const { id, ...data } = stage;
                     return {
-                    id,
-                    data
+                        id,
+                        data: {
+                            id,
+                            ...data
+                        }
                     };
-                });
+                    });
                 }
 
                 // Usage:
