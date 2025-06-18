@@ -1,6 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 import { AuthService } from './app.authService';
 import { DDEService } from './modules/dde/ddde.service';
 import { lastValueFrom } from "rxjs";
@@ -11,7 +10,6 @@ export class DDE4DataSyncService {
 
     constructor(
         private readonly httpService: HttpService,
-        private configService: ConfigService,
         private readonly DDEService: DDEService,
         private readonly authService: AuthService
     ) {}

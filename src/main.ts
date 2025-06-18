@@ -17,6 +17,8 @@ import { StockModule } from "./modules/stock/stock.module";
 import { RelationshipModule } from "./modules/relationship/relationship.module";
 import { FacilityModule } from "./modules/facilities/facilities.module";
 import { DDEModule } from "./modules/dde/dde.module";
+import { VisitModule } from "./modules/visit/visit.module";
+import { StageModule } from "./modules/stage/stage.module";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -71,7 +73,9 @@ async function bootstrap() {
       StockModule,
       RelationshipModule,
       FacilityModule,
-      DDEModule
+      DDEModule,
+      VisitModule,
+      StageModule,
     ],
     operationIdFactory: (controllerKey: string, methodKey: string) =>
       `${controllerKey}_${methodKey}`,

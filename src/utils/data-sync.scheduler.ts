@@ -11,6 +11,7 @@ import { PatientService } from '../modules/patient/patient.service';
 import { DDE4DataSyncService } from './../app.dde4dataSyncService';
 import { DDEService } from '../modules/dde/ddde.service';
 import { ServerPatientCount, ServerPatientCountDocument } from '../modules/serverPatientCount/schema/server-patient-count.schema';
+import { VisitAndStagesSyncService } from './../app.VisitAndStagesSyncService';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -25,6 +26,7 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly patientService: PatientService,
     private readonly DDE4Service: DDE4DataSyncService,
     private readonly ddeService: DDEService,
+    private readonly visitAndStagesSyncService: VisitAndStagesSyncService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(ServerPatientCount.name) private readonly serverPatientCountModel: Model<ServerPatientCountDocument>,
   ) {
@@ -90,6 +92,9 @@ async checkPatientCountChanges() {
         this.ddeService
       )
     );
+    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+
   } catch (error) {
     this.logger.error(`Patient count check failed: ${error.message}`);
   }
@@ -106,8 +111,7 @@ async checkPatientCountChanges() {
         this.httpService,
         this.logger,
     );
-    const result = await this.dataSyncService.syncPatientRecords();
-    // 	http://localhost:3000/api/v1//patients/6270/get_patient_record
+    await this.dataSyncService.syncPatientRecords();
     await syncPatientIds(
         this.authService,
         this.httpService,
@@ -115,13 +119,8 @@ async checkPatientCountChanges() {
         this.patientService,
         this.ddeService
       );
-    
-    this.logger.log(`Sync operation completed: ${result.message}`);
-    // if (result.failed > 0) {
-    //   this.logger.warn(`${result.failed} records failed to sync`);
-    // }
-    
-    return result;
+    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
   }
 
   /**

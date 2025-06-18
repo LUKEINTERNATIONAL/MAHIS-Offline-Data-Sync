@@ -34,6 +34,11 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { DDE4DataSyncService } from "./app.dde4dataSyncService";
 import { DDEModule } from "./modules/dde/dde.module";
 import { ServerPatientCountModule } from "./modules/serverPatientCount/server-patient-count.module";
+import { VisitModule } from "./modules/visit/visit.module";
+import { VisitService } from "./modules/visit/visit.service";
+import { StageModule } from "./modules/stage/stage.module";
+import { StageService } from "./modules/stage/stage.service";
+import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
 
 @Module({
   imports: [
@@ -72,6 +77,8 @@ import { ServerPatientCountModule } from "./modules/serverPatientCount/server-pa
     AuthModule,
     DDEModule,
     ServerPatientCountModule,
+    VisitModule,
+    StageModule,
   ],
   controllers: [AppController],
   providers: [
@@ -81,7 +88,10 @@ import { ServerPatientCountModule } from "./modules/serverPatientCount/server-pa
     DataSyncScheduler,
     SyncGateway,
     LoadDataOnStartService,
-    DDE4DataSyncService
+    DDE4DataSyncService,
+    VisitService,
+    StageService,
+    VisitAndStagesSyncService,
   ],
   exports: [AuthService, DataSyncService, DDE4DataSyncService],
 })
