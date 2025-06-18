@@ -92,6 +92,9 @@ async checkPatientCountChanges() {
         this.ddeService
       )
     );
+    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+
   } catch (error) {
     this.logger.error(`Patient count check failed: ${error.message}`);
   }
@@ -108,8 +111,7 @@ async checkPatientCountChanges() {
         this.httpService,
         this.logger,
     );
-    const result = await this.dataSyncService.syncPatientRecords();
-    // 	http://localhost:3000/api/v1//patients/6270/get_patient_record
+    await this.dataSyncService.syncPatientRecords();
     await syncPatientIds(
         this.authService,
         this.httpService,
@@ -118,15 +120,7 @@ async checkPatientCountChanges() {
         this.ddeService
       );
     await this.visitAndStagesSyncService.getStagesViaExternalAPI();
-
-    
-    this.logger.log(`Sync operation completed: ${result.message}`);
-
-    // if (result.failed > 0) {
-    //   this.logger.warn(`${result.failed} records failed to sync`);
-    // }
-    
-    return result;
+    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
   }
 
   /**
