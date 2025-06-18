@@ -3,6 +3,8 @@ import { Controller, Post, Body, Get, Header, Param, NotFoundException, Query } 
 import { AppService } from './app.service';
 import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
+import { VisitService } from './modules/visit/visit.service';
+import { StageService } from './modules/stage/stage.service';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -19,6 +21,8 @@ export class AppController {
     private readonly appService: AppService,
     private readonly patientService: PatientService,
     private readonly ddeService: DDEService,
+    private readonly visitService: VisitService,
+    private readonly stageService: StageService
   ) {}
 
   @Get()
@@ -56,6 +60,16 @@ export class AppController {
   @Get('unassigned-npid')
   getUnassignedNpid() {
     return this.ddeService.findRandomWithNullStatus();
+  }
+
+  @Get('visits')
+  getVisits() {
+    return this.visitService.findAll();
+  }
+
+  @Get('stages')
+  getStages() {
+    return this.stageService.findAll();
   }
 
   @Get('search')
