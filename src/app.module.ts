@@ -53,7 +53,7 @@ import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
     ScheduleModule.forRoot(),
 
     // Database configuration
-    MongooseModule.forRoot("mongodb://0.0.0.0:27017/MODS"),
+    MongooseModule.forRoot("mongodb://localhost:27017/MODS"),
   
     // Register entities
     PatientModule,
