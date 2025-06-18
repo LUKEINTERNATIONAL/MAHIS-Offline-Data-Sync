@@ -63,13 +63,15 @@ export class AppController {
   }
 
   @Get('visits')
-  getVisits() {
-    return this.visitService.findAll();
+  async getVisits() {
+    const visits = await this.visitService.findAll();
+    return visits.map(visit => visit.data);
   }
 
   @Get('stages')
-  getStages() {
-    return this.stageService.findAll();
+  async getStages() {
+    const stages = await this.stageService.findAll();
+    return stages.map(stage => stage.data);
   }
 
   @Get('search')
