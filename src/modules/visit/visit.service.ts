@@ -172,8 +172,7 @@ export class VisitService {
           }));
 
           const createManyResult = await this.prisma.visit.createMany({
-            data: processedNewVisits,
-            skipDuplicates: true
+            data: processedNewVisits
           });
           
           // Fetch the created visits (since createMany doesn't return the created records)
@@ -199,8 +198,7 @@ export class VisitService {
       }));
 
       const createManyResult = await this.prisma.visit.createMany({
-        data: processedVisits,
-        skipDuplicates: true
+        data: processedVisits
       });
       
       // Fetch the created visits

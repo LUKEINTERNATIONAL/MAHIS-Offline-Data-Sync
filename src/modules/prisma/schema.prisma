@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model ConceptName {
+  
+  id               String @id @default(auto()) @map("_id") @db.ObjectId
+  concept_name_id  Int    @unique
+  
+  
+
+  concept_id       Int
+  name             String
+
+  @@map("conceptnames")
+}
+
 model ConceptSet {
   
   id             String @id @default(auto()) @map("_id") @db.ObjectId

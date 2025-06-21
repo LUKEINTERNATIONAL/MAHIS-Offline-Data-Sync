@@ -4,14 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { DataSyncService } from './../app.dataSyncService';
 import { AuthService, fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges } from './../app.authService';
 import { HttpService } from '@nestjs/axios';
-import { User, UserDocument } from '../modules/user/schema/user.schema';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { PatientService } from '../modules/patient/patient.service';
 import { DDE4DataSyncService } from './../app.dde4dataSyncService';
 import { DDEService } from '../modules/dde/ddde.service';
-import { ServerPatientCount, ServerPatientCountDocument } from '../modules/serverPatientCount/schema/server-patient-count.schema';
 import { VisitAndStagesSyncService } from './../app.VisitAndStagesSyncService';
+import { UserService } from '../modules/user/user.service';
+import { ServerPatientCountService } from '../modules/serverPatientCount/server-patient-count.service';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -27,8 +25,8 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly DDE4Service: DDE4DataSyncService,
     private readonly ddeService: DDEService,
     private readonly visitAndStagesSyncService: VisitAndStagesSyncService,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(ServerPatientCount.name) private readonly serverPatientCountModel: Model<ServerPatientCountDocument>,
+    private readonly userService: UserService,
+    private readonly serverPatientCountService: ServerPatientCountService,
   ) {
     // Get configuration from environment variables with defaults
     this.isEnabled = this.configService.get<string>('SYNC_SCHEDULER_ENABLED') !== 'false';
@@ -83,7 +81,7 @@ async checkPatientCountChanges() {
       this.authService,
       this.httpService, 
       this.logger,
-      this.serverPatientCountModel,
+      this.serverPatientCountService,
       () => syncPatientIds(
         this.authService,
         this.httpService,
@@ -107,7 +105,7 @@ async checkPatientCountChanges() {
     await this.DDE4Service.getDDEIDSViaExternalAPI();
     await fetchAndSaveUserData(
         this.authService,
-        this.userModel,
+        this.userService,
         this.httpService,
         this.logger,
     );

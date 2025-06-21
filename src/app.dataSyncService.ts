@@ -5,6 +5,28 @@ import { AuthService } from './app.authService';
 import { lastValueFrom } from 'rxjs';
 import { SyncGateway } from './websocket/gateways/sync.gateway';
 import { DDEService } from './modules/dde/ddde.service';
+import { Patient } from '@prisma/client';
+
+interface SyncResult {
+  success: boolean;
+  message: string;
+  total?: number;
+  successful?: number;
+  failed?: number;
+  errors?: Array<{
+    recordId: string;
+    patientID: string;
+    error: string;
+  }>;
+  updatedRecords?: string[];
+  count?: number;
+}
+
+interface SyncStatus {
+  totalRecords: number;
+  lastSyncedRecords: number;
+  pendingSync: number;
+}
 
 @Injectable()
 export class DataSyncService {
@@ -21,7 +43,7 @@ export class DataSyncService {
   /**
    * Sync all patient records from the local database to the external API
    */
-  async syncPatientRecords() {
+  async syncPatientRecords(): Promise<SyncResult> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
@@ -39,7 +61,9 @@ export class DataSyncService {
       this.logger.log(`Found ${allRecords.length} records to sync`);
       const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
       
-      const results = {
+      const results: SyncResult = {
+        success: true,
+        message: '',
         total: allRecords.length,
         successful: 0,
         failed: 0,
@@ -49,69 +73,51 @@ export class DataSyncService {
 
       for (const record of allRecords) {
         try {
-          let parsedData: any = {};
-          try {
-            if (record.data) {
-              parsedData = record.data;
-            }
-          } catch (parseError) {
-            this.logger.warn(`Failed to parse data for record ID ${record._id.toString()}: ${parseError.message}`);
-          }
-
-          const syncPayload = {
-            record: {
-              ...parsedData,
-              patientID: parsedData.ID, // Explicitly include patientID
-              timestamp: record.timestamp,
-            }
-          };
-
-          const { data: responseData } = await lastValueFrom(
-            this.httpService.post(saveUrl, syncPayload, {
-              headers: {
-                Authorization: this.authService.getAuthToken(),
-                'Content-Type': 'application/json',
-              },
-            })
-          );
-
-          if (responseData) {
-            // Update using PatientService by MongoDB _id
-            await this.patientService.updateByPatientId(parsedData.ID, parsedData);
-            this.ddeService.markAsCompleted(parsedData.ID);
-            this.syncGateway.broadcastPatientUpdate(record.patientID, parsedData);
-            
+          const syncResult = await this.syncSingleRecord(record, saveUrl);
+          if (syncResult.success) {
             results.successful++;
-            results.updatedRecords.push(record._id);
+            results.updatedRecords.push(record.id);
+          } else {
+            results.failed++;
+            results.errors.push({
+              recordId: record.id,
+              patientID: record.patientID,
+              error: syncResult.error || 'Unknown error',
+            });
           }
-
         } catch (syncError) {
-          // this.logger.error(`Error processing record ID ${record._id.toString()}: ${syncError.message}`);
+          this.logger.error(`Error processing record ID ${record.id}: ${syncError.message}`);
           results.failed++;
           results.errors.push({
-            recordId: record._id.toString(),
+            recordId: record.id,
             patientID: record.patientID,
             error: syncError.message,
           });
         }
       }
 
+      results.message = `Synced ${results.successful} of ${results.total} records`;
       this.logger.log(`Sync completed. Successfully synced and updated ${results.successful}/${results.total} records`);
-      return {
-        success: true,
-        message: `Synced ${results.successful} of ${results.total} records`,
-        ...results,
-      };
+      
+      return results;
     } catch (error) {
       this.logger.error(`Patient record sync failed: ${error.message}`, error.stack);
-      // throw error;
+      return {
+        success: false,
+        message: `Sync failed: ${error.message}`,
+        total: 0,
+        successful: 0,
+        failed: 0,
+        errors: [],
+        updatedRecords: [],
+      };
     }
   }
 
   /**
    * Sync specific patient record by patientID
    */
-  async syncPatientRecord(patientID: string) {
+  async syncPatientRecord(patientID: string): Promise<any> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
@@ -127,67 +133,46 @@ export class DataSyncService {
       }
 
       const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+      const syncResult = await this.syncSingleRecord(record, saveUrl);
       
-      let parsedData: any = {};
-      try {
-        if (record.data) {
-          parsedData = record.data;
-        }
-      } catch (parseError) {
-        this.logger.warn(`Failed to parse data for patientID ${patientID}: ${parseError.message}`);
-      }
-
-      const syncPayload = {
-        record: {
-          ...parsedData,
-          timestamp: record.timestamp,
-        }
-      };
-
-      const { data: responseData } = await lastValueFrom(
-        this.httpService.post(saveUrl, syncPayload, {
-          headers: {
-            Authorization: this.authService.getAuthToken(),
-            'Content-Type': 'application/json',
-          },
-        })
-      );
-
-      if (responseData) {
-        // Update using PatientService by patientID
-        const updatedPatient = await this.patientService.updateByPatientId(responseData.ID, {
-          data: responseData,
+      if (syncResult.success && syncResult.responseData) {
+        // Update the patient record with the API response
+        const updatedPatient = await this.patientService.updateByPatientId(patientID, {
+          data: syncResult.responseData,
           message: 'Updated from API response',
-          timestamp: Date.now(),
+          timestamp:  new Date().toISOString() as any,
         });
 
-        this.syncGateway.broadcastPatientUpdate(patientID, responseData);
-        this.ddeService.markAsCompleted(responseData.ID);
+        this.syncGateway.broadcastPatientUpdate(patientID, syncResult.responseData);
+        this.ddeService.markAsCompleted(syncResult.responseData.ID || patientID);
 
-        this.logger.log('New Patiend ID: ', responseData.ID);
         this.logger.log(`Successfully synced patient record: ${patientID}`);
-
-        return responseData
+        return syncResult.responseData;
       }
 
       return null;
-
     } catch (error) {
       this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
-      // throw error;
+      throw error;
     }
   }
 
-  async syncPatientRecordWithPayload(syncPayload: any) {
+  /**
+   * Sync patient record with custom payload
+   */
+  async syncPatientRecordWithPayload(syncPayload: any): Promise<any> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
         throw new Error('Failed to authenticate');
       }
 
-      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+      if (!syncPayload) {
+        throw new Error('Sync payload is required');
+      }
 
-      this.logger.log("syncPayload :", syncPayload);
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+      this.logger.log("Syncing with payload:", JSON.stringify(syncPayload, null, 2));
 
       const { data: responseData } = await lastValueFrom(
         this.httpService.post(saveUrl, syncPayload, {
@@ -198,32 +183,32 @@ export class DataSyncService {
         })
       );
 
+      this.logger.log('Sync response received:', JSON.stringify(responseData, null, 2));
       return responseData;
-
     } catch (error) {
-      this.logger.error(`Failed to sync patient record: ${error.message}`);
-      // throw error;
+      this.logger.error(`Failed to sync patient record with payload: ${error.message}`);
+      throw error;
     }
-    }
+  }
 
   /**
    * Get sync status for all patients
    */
-  async getSyncStatus() {
+  async getSyncStatus(): Promise<SyncStatus> {
     try {
       const allRecords = await this.patientService.findAll();
       
-      const status = {
-        totalRecords: allRecords.length,
-        lastSyncedRecords: allRecords.filter(record => 
-          record.message && record.message.includes('Updated from API response')
-        ).length,
-        pendingSync: allRecords.filter(record => 
-          !record.message || !record.message.includes('Updated from API response')
-        ).length,
-      };
+      const lastSyncedRecords = allRecords.filter(record => 
+        record.message && record.message.includes('Updated from API response')
+      ).length;
 
-      return status;
+      const pendingSync = allRecords.length - lastSyncedRecords;
+
+      return {
+        totalRecords: allRecords.length,
+        lastSyncedRecords,
+        pendingSync,
+      };
     } catch (error) {
       this.logger.error(`Failed to get sync status: ${error.message}`);
       throw error;
@@ -239,6 +224,165 @@ export class DataSyncService {
       this.logger.log('DataSyncService initialized successfully');
     } catch (error) {
       this.logger.error(`Failed to initialize DataSyncService: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method to sync a single record
+   */
+  private async syncSingleRecord(record: Patient, saveUrl: string): Promise<{
+    success: boolean;
+    error?: string;
+    responseData?: any;
+  }> {
+    try {
+      // Safely extract data from the record
+      let parsedData: any = {};
+      if (record.data) {
+        if (typeof record.data === 'string') {
+          try {
+            parsedData = JSON.parse(record.data);
+          } catch (parseError) {
+            this.logger.warn(`Failed to parse data for record ID ${record.id}: ${parseError.message}`);
+            parsedData = {};
+          }
+        } else {
+          parsedData = record.data;
+        }
+      }
+
+      const syncPayload = {
+        record: {
+          ...parsedData,
+          patientID: parsedData.ID || record.patientID,
+          timestamp: record.timestamp,
+        }
+      };
+
+      const { data: responseData } = await lastValueFrom(
+        this.httpService.post(saveUrl, syncPayload, {
+          headers: {
+            Authorization: this.authService.getAuthToken(),
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000, // 30 second timeout
+        })
+      );
+
+      if (responseData) {
+        // Update the local record with the response
+        const patientId = parsedData.ID || record.patientID;
+        await this.patientService.updateByPatientId(patientId, {
+          data: responseData,
+          message: 'Updated from API response',
+          timestamp: new Date().toISOString() as any,
+        });
+
+        this.ddeService.markAsCompleted(patientId);
+        this.syncGateway.broadcastPatientUpdate(patientId, responseData);
+
+        return { success: true, responseData };
+      }
+
+      return { success: false, error: 'No response data received' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Batch sync with concurrency control
+   */
+  async syncPatientRecordsBatch(batchSize: number = 5): Promise<SyncResult> {
+    try {
+      const isAuthenticated = await this.authService.ensureAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate');
+      }
+
+      this.logger.log('Fetching all patient records from database');
+      const allRecords = await this.patientService.findAll();
+      
+      if (!allRecords || allRecords.length === 0) {
+        this.logger.log('No records found in database to sync');
+        return { success: true, message: 'No records to sync', count: 0 };
+      }
+
+      this.logger.log(`Found ${allRecords.length} records to sync in batches of ${batchSize}`);
+      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+      
+      const results: SyncResult = {
+        success: true,
+        message: '',
+        total: allRecords.length,
+        successful: 0,
+        failed: 0,
+        errors: [],
+        updatedRecords: [],
+      };
+
+      // Process records in batches
+      for (let i = 0; i < allRecords.length; i += batchSize) {
+        const batch = allRecords.slice(i, i + batchSize);
+        this.logger.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allRecords.length / batchSize)}`);
+
+        const batchPromises = batch.map(async (record) => {
+          try {
+            const syncResult = await this.syncSingleRecord(record, saveUrl);
+            return { record, syncResult };
+          } catch (error) {
+            return { record, syncResult: { success: false, error: error.message } };
+          }
+        });
+
+        const batchResults = await Promise.allSettled(batchPromises);
+
+        batchResults.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            const { record, syncResult } = result.value;
+            if (syncResult.success) {
+              results.successful++;
+              results.updatedRecords.push(record.id);
+            } else {
+              results.failed++;
+              results.errors.push({
+                recordId: record.id,
+                patientID: record.patientID,
+                error: syncResult.error || 'Unknown error',
+              });
+            }
+          } else {
+            results.failed++;
+            results.errors.push({
+              recordId: 'unknown',
+              patientID: 'unknown',
+              error: result.reason?.message || 'Promise rejected',
+            });
+          }
+        });
+
+        // Small delay between batches to avoid overwhelming the API
+        if (i + batchSize < allRecords.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      results.message = `Synced ${results.successful} of ${results.total} records`;
+      this.logger.log(`Batch sync completed. Successfully synced ${results.successful}/${results.total} records`);
+      
+      return results;
+    } catch (error) {
+      this.logger.error(`Batch patient record sync failed: ${error.message}`, error.stack);
+      return {
+        success: false,
+        message: `Sync failed: ${error.message}`,
+        total: 0,
+        successful: 0,
+        failed: 0,
+        errors: [],
+        updatedRecords: [],
+      };
     }
   }
 }

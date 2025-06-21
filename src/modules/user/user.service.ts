@@ -59,17 +59,6 @@ export class UserService {
     }
   }
 
-  async findByEmail(email: string) {
-    try {
-      return await this.prisma.user.findUnique({
-        where: { email }
-      });
-    } catch (error) {
-      this.logger.error(`Failed to find user by email ${email}: ${error.message}`, error.stack);
-      return null;
-    }
-  }
-
   async findByUserId(userId: number): Promise<User | null> {
     try {
       return await this.prisma.user.findUnique({
@@ -135,6 +124,18 @@ export class UserService {
     }
   }
 
+  // NEW METHOD: Delete all users
+  async deleteAll(): Promise<{ count: number }> {
+    try {
+      const result = await this.prisma.user.deleteMany({});
+      this.logger.log(`Deleted ${result.count} users`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to delete all users: ${error.message}`, error.stack);
+      return { count: 0 };
+    }
+  }
+
   async existsByUserId(userId: number): Promise<boolean> {
     try {
       const user = await this.prisma.user.findUnique({
@@ -186,5 +187,11 @@ export class UserService {
       this.logger.error(`Failed to count users: ${error.message}`, error.stack);
       return 0;
     }
+  }
+
+  async findLatestUser() {
+    return this.prisma.user.findFirst({
+      orderBy: { id: 'desc' }
+    });
   }
 }

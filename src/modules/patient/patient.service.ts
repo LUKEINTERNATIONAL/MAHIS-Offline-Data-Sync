@@ -214,7 +214,7 @@ export class PatientService {
     const total_pages = Math.ceil(total / per_page);
 
     return {
-      data: patients.map(patient => this.parsePatientData(patient).data),
+      data: patients.map(patient => this.parsePatientData(patient as any).data),
       pagination: {
         current_page: page,
         per_page: per_page,
@@ -243,10 +243,12 @@ export class PatientService {
           }
         } as any;
       } else {
-        // SQLite - use JSON_EXTRACT function
+        // SQLite - use JSON equality check for data.ID
         whereClause = {
           data: {
-            contains: `"ID":"${dataId}"`
+            equals: {
+              ID: dataId
+            }
           }
         };
       }
@@ -442,6 +444,6 @@ export class PatientService {
           contains: term
         }
       }))
-    };
+    } as Prisma.PatientWhereInput;
   }
 }
