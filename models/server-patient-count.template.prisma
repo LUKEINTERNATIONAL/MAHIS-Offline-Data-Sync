@@ -1,0 +1,15 @@
+model ServerPatientCount {
+  {{#if_mongodb}}
+  id                   String @id @default(auto()) @map("_id") @db.ObjectId
+  server_patient_count Int
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id                   Int    @id @default(autoincrement())
+  server_patient_count Int
+  {{/if_sqlite}}
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("server_patient_counts")
+}

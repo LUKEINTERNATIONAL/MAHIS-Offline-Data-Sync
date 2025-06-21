@@ -1,0 +1,14 @@
+model User {
+  {{#if_mongodb}}
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  user_id    Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id         String @id @default(cuid())
+  user_id    Int    @unique
+  {{/if_sqlite}}
+
+  locationId String
+
+  @@map("users")
+}

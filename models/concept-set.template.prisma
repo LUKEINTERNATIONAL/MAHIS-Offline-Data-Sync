@@ -1,0 +1,15 @@
+model ConceptSet {
+  {{#if_mongodb}}
+  id             String @id @default(auto()) @map("_id") @db.ObjectId
+  concept_set_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id             String @id @default(cuid())
+  concept_set_id Int    @unique
+  {{/if_sqlite}}
+
+  concept_set_name String
+  member_ids       Json   @default("[]")
+
+  @@map("concept_sets")
+}

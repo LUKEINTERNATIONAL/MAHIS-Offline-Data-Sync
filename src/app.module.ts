@@ -2,14 +2,12 @@ import { Module } from "@nestjs/common";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
-import { MongooseModule } from "@nestjs/mongoose";
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { DataSyncService } from "./app.dataSyncService";
 import { DataSyncScheduler } from "./utils/data-sync.scheduler";
 import { AuthService } from "./app.authService";
-import { User } from "./entities/user.entity";
 import { SyncGateway } from "./websocket/gateways/sync.gateway";
 import { ConceptNameModule } from "./modules/conceptName/concept-name.module";
 import { WardModule } from "./modules/wards/ward.module";
@@ -21,7 +19,6 @@ import { DiagnosisModule } from "./modules/diagnosis/diagnosis.module";
 import { RelationshipModule } from "./modules/relationship/relationship.module";
 import { TestResultIndicatorModule } from "./modules/testResultIndicator/test-result-indicator.module";
 import { StockModule } from "./modules/stock/stock.module";
-import { Village } from "./modules/village/schema/village.schema";
 import { ProgramModule } from "./modules/programs/program.module";
 import { TestTypeModule } from "./modules/testTypes/test-type.module";
 import { FacilityModule } from "./modules/facilities/facilities.module";
@@ -39,6 +36,7 @@ import { VisitService } from "./modules/visit/visit.service";
 import { StageModule } from "./modules/stage/stage.module";
 import { StageService } from "./modules/stage/stage.service";
 import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
+import { PrismaModule } from "./modules/prisma/prisma.module";
 
 @Module({
   imports: [
@@ -52,10 +50,10 @@ import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
     // Scheduler module for cron jobs
     ScheduleModule.forRoot(),
 
-    // Database configuration
-    MongooseModule.forRoot("mongodb://localhost:27017/MODS"),
+    // Prisma database configuration (replaces MongooseModule)
+    PrismaModule,
   
-    // Register entities
+    // Register modules (same as before)
     PatientModule,
     ConceptNameModule,
     WardModule,
@@ -66,7 +64,6 @@ import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
     RelationshipModule,
     TestResultIndicatorModule,
     StockModule,
-    Village,
     ProgramModule,
     TestTypeModule,
     FacilityModule, 

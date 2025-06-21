@@ -1,0 +1,14 @@
+model Visit {
+  {{#if_mongodb}}
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  visit_id Int    @unique
+  data     Json   // MongoDB native JSON
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id       String @id @default(cuid())
+  visit_id Int    @unique
+  data     String // SQLite stores JSON as TEXT
+  {{/if_sqlite}}
+
+  @@map("visits")
+}

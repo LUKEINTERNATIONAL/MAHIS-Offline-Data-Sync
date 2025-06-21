@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { DDE, DDESchema } from './schema/dde.shema';
+import { PrismaModule } from '../prisma/prisma.module';
 import { DDEService } from './ddde.service';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: DDE.name, schema: DDESchema }]),
-  ],
+  imports: [PrismaModule],
   providers: [DDEService],
-  exports: [DDEService, MongooseModule],
+  exports: [DDEService],
 })
 export class DDEModule {}

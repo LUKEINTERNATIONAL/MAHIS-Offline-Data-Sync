@@ -1,11 +1,9 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from './schema/user.schema';
+import { PrismaService } from '../prisma/prisma.service'; // Adjust path as needed
+import { UserService } from './user.service'; // If you have a UserService
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])
-  ],
-  exports: [MongooseModule]
+  providers: [PrismaService, UserService], // Add UserService if you have one
+  exports: [PrismaService, UserService] // Export what other modules need
 })
 export class UserModule {}

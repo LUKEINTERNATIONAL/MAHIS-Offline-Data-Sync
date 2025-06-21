@@ -1,0 +1,16 @@
+model Village {
+  {{#if_mongodb}}
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  village_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id         String @id @default(cuid())
+  village_id Int    @unique
+  {{/if_sqlite}}
+
+  name                     String
+  traditional_authority_id Int
+  date_created             DateTime
+
+  @@map("villages")
+}

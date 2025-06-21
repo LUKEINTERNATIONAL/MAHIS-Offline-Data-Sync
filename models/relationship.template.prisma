@@ -1,0 +1,25 @@
+model Relationship {
+  {{#if_mongodb}}
+  id                   String @id @default(auto()) @map("_id") @db.ObjectId
+  relationship_type_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id                   String @id @default(cuid())
+  relationship_type_id Int    @unique
+  {{/if_sqlite}}
+
+  a_is_to_b     String
+  b_is_to_a     String
+  description   String?
+  preferred     Boolean  @default(false)
+  weight        Int?
+  creator       Int
+  date_created  DateTime
+  date_retired  DateTime?
+  retired       Boolean  @default(false)
+  retire_reason String?
+  retired_by    Int?
+  uuid          String   @unique
+
+  @@map("relationships")
+}

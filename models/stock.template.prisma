@@ -1,0 +1,39 @@
+model Stock {
+  {{#if_mongodb}}
+  id                  String @id @default(auto()) @map("_id") @db.ObjectId
+  pharmacy_batch_id   Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id                  String @id @default(cuid())
+  pharmacy_batch_id   Int    @unique
+  {{/if_sqlite}}
+
+  barcode               String?
+  batch_number          String?
+  drug_id               Int
+  drug_legacy_name      String?
+  drug_name             String?
+  product_code          String?
+  manufacture           String?
+  dosage_form           String?
+  unit_doses            Int?
+  pack_size             Int?
+  expiry_date           String?
+  delivery_date         String?
+  delivered_quantity    Int     @default(0)
+  dispensed_quantity    Int     @default(0)
+  doses_wasted          Int     @default(0)
+  current_quantity      Int     @default(0)
+  total_count           Int?
+  creator               Int
+  changed_by            Int?
+  date_created          DateTime
+  date_changed          DateTime?
+  latest_date_changed   DateTime?
+  voided                Boolean  @default(false)
+  void_reason           String?
+  date_voided           DateTime?
+  voided_by             Int?
+
+  @@map("stocks")
+}
