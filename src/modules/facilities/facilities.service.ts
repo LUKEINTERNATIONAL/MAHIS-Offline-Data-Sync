@@ -46,7 +46,7 @@ export class FacilitiesService {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        // this.logger.error("Failed to authenticate")
       }
       const apiUrl = this.authService.getBaseUrl();
       const token = this.authService.getAuthToken();

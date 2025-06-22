@@ -47,7 +47,7 @@ export class DataSyncService {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        this.logger.error("Failed to authenticate")
       }
 
       this.logger.log('Fetching all patient records from database');
@@ -121,7 +121,7 @@ export class DataSyncService {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        this.logger.error("Failed to authenticate")
       }
 
       this.logger.log(`Syncing specific patient record: ${patientID}`);
@@ -164,7 +164,7 @@ export class DataSyncService {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        this.logger.error("Failed to authenticate")
       }
 
       if (!syncPayload) {
@@ -224,7 +224,7 @@ export class DataSyncService {
       this.logger.log('DataSyncService initialized successfully');
     } catch (error) {
       this.logger.error(`Failed to initialize DataSyncService: ${error.message}`);
-      throw error;
+      // throw error;
     }
   }
 
@@ -298,7 +298,7 @@ export class DataSyncService {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        this.logger.error("Failed to authenticate")
       }
 
       this.logger.log('Fetching all patient records from database');

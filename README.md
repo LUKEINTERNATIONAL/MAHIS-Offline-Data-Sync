@@ -49,3 +49,6 @@
    - Go to:
      `Settings > Security > Encryption & credentials > Install a certificate > CA`
    - Select the file: `rootCA.pem`
+
+
+npx prisma migrate dev --name init

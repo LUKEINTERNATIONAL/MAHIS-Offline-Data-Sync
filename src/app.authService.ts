@@ -181,7 +181,6 @@ async function fetchAndSaveUserData(
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
       logger.error('Failed to authenticate');
-      throw new Error('Failed to authenticate');
     }
     
     // Get the most recent user
@@ -224,7 +223,6 @@ async function updateIfSitePatientCountChanges(
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
       logger.error('Failed to authenticate');
-      throw new Error('Failed to authenticate');
     }
 
     const initialRequest: SyncRequest = {
@@ -311,7 +309,6 @@ async function syncPatientIds(
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
       logger.error('Failed to authenticate');
-      throw new Error('Failed to authenticate');
     }
 
     const PAGE_SIZE = 50;
@@ -385,7 +382,7 @@ async function makePatientSyncRequest(
   try {
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
-      throw new Error('Failed to authenticate');
+      logger.error("Failed to authenticate")
     }
     
     const syncUrl = `${authService.getBaseUrl()}/sync/patients_ids`;
@@ -430,7 +427,7 @@ async function updatePayload(
     const result = await patientService.updateByPatientId(
       patient.ID.toString(),
       {
-        timestamp:  new Date().toISOString() as any || Date.now(),
+        timestamp: new Date().toISOString(),
         message: 'Updated/Created payload from API VIA ALL',
         data: patient
       }
@@ -446,7 +443,7 @@ async function updatePayload(
     }
   } catch (error) {
     logger.error(`Error updating patient record: ${error.message}`);
-    throw error;
+    // throw error;
   }
 }
 

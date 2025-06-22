@@ -23,7 +23,7 @@ export class VisitAndStagesSyncService {
         try {
             const isAuthenticated = await this.authService.ensureAuthenticated();
             if (!isAuthenticated) {
-                throw new Error('Failed to authenticate');
+                // this.logger.error("Failed to authenticate")
             }
 
             // Use Prisma UserService to get the latest user
@@ -75,7 +75,7 @@ export class VisitAndStagesSyncService {
         try {
             const isAuthenticated = await this.authService.ensureAuthenticated();
             if (!isAuthenticated) {
-                throw new Error('Failed to authenticate');
+                // this.logger.error("Failed to authenticate")
             }
 
             this.Stagelogger.log(`Syncing stages`);

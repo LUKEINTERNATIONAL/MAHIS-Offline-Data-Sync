@@ -21,7 +21,6 @@ export class PatientService {
 
   async create(data: Partial<Patient>): Promise<Patient> {
     const createData: Prisma.PatientCreateInput = {
-      ...data,
       patientID: data.patientID!,
       message: data.message || '',
       data: this.isSQLite ? JSON.stringify(data.data) : data.data,
@@ -74,7 +73,6 @@ export class PatientService {
     data: Partial<Patient> & { data?: any }
   ): Promise<Patient | null> {
     try {
-      // Handle nested data updates for both MongoDB and SQLite
       let updateData: any = { ...data };
       
       if (data.data) {
@@ -107,12 +105,11 @@ export class PatientService {
           message: data.message || '',
           timestamp: data.timestamp
             ? typeof data.timestamp === 'string'
-              ? Date.parse(data.timestamp)
-              : Number(data.timestamp)
+              ? data.timestamp
+              : data.timestamp
             : undefined,
           data: this.isSQLite ? JSON.stringify(data.data || {}) : (data.data || {}),
-          ...updateData
-        }
+        } as any
       });
       
       return this.parsePatientData(patient);
