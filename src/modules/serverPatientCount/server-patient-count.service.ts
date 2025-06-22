@@ -16,20 +16,20 @@ export class ServerPatientCountService {
     return this.prisma.serverPatientCount.findMany();
   }
 
-  async findOne(id: number) {
+  async findOne(id: any) {
     return this.prisma.serverPatientCount.findUnique({
       where: { id }
     });
   }
 
-  async update(id: number, data: { server_patient_count: number }) {
+  async update(id: any, data: { server_patient_count: number }) {
     return this.prisma.serverPatientCount.update({
       where: { id },
       data
     });
   }
 
-  async remove(id: number) {
+  async remove(id: any) {
     return this.prisma.serverPatientCount.delete({
       where: { id }
     });

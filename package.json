@@ -10,7 +10,7 @@
         "start:prod": "node dist/main.js",
         "test": "jest",
         "schema:generate": "node scripts/generate-schema.js",
-        "prisma:generate": "npm run schema:generate && prisma generate",
+        "prisma:generate": "npm run schema:generate && npx prisma generate",
         "dev": "npm run prisma:generate && npm run start:dev"
     },
     "prisma": {

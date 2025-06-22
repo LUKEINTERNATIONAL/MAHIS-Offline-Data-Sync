@@ -266,7 +266,7 @@ async function updateIfSitePatientCountChanges(
       
       // Delete all old records
       for (const record of recordsToDelete) {
-        await serverPatientCountService.remove(record.id);
+        await serverPatientCountService.remove(record.id as any);
       }
       
       logger.log(`Cleaned up ${recordsToDelete.length} duplicate patient count records`);

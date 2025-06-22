@@ -248,14 +248,11 @@ export class PatientService {
         patients = (result?.cursor?.firstBatch as Patient[]) || [];
       } else {
         // For SQLite, the patient "data" object uses "id" as the key
-        patients = await this.prisma.patient.findMany({
-          where: {
-            data: {
-              contains: `"id":"${dataId}"`
-            }
-          },
-          orderBy: { createdAt: 'desc' }
-        });
+        patients = await (this.prisma as any).$queryRaw<Patient[]>`
+          SELECT * FROM patient
+          WHERE json_extract(data, '$.id') = ${dataId}
+          ORDER BY createdAt DESC
+        `;
       }
 
       const parsedPatients = patients.map(p => this.parsePatientData(p));
