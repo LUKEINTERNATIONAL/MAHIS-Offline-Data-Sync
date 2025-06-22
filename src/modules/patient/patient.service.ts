@@ -13,7 +13,7 @@ export class PatientService {
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
-    const dbType = this.configService.get<string>('DATABASE_TYPE', 'mongodb');
+    const dbType = this.configService.get<string>('DATABASE_PROVIDER', 'mongodb');
     this.isMongoDB = dbType === 'mongodb';
     this.isSQLite = dbType === 'sqlite';
     this.logger.log(`Using ${dbType} database`);

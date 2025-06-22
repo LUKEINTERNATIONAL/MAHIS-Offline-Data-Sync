@@ -421,7 +421,7 @@ export class StageService {
     
     // For MongoDB, Prisma handles JSON natively
     // For SQLite, we need to stringify JSON data
-    if (process.env.DATABASE_TYPE === 'sqlite') {
+    if (process.env.DATABASE_PROVIDER.toString() === 'sqlite') {
       return JSON.stringify(data);
     }
     
@@ -432,7 +432,7 @@ export class StageService {
     if (data === null || data === undefined) return null;
     
     // For SQLite, parse the JSON string
-    if (process.env.DATABASE_TYPE === 'sqlite' && typeof data === 'string') {
+    if (process.env.DATABASE_PROVIDER.toString() === 'sqlite' && typeof data === 'string') {
       try {
         return JSON.parse(data);
       } catch (error) {
