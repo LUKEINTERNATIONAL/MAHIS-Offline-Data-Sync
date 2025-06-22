@@ -42,7 +42,7 @@ import { PrismaModule } from "./modules/prisma/prisma.module";
   imports: [
     // Config module for environment variables
     ConfigModule.forRoot({
-      isGlobal: true, 
+      isGlobal: true, // makes ConfigService available everywhere
     }),
     // HTTP module for API requests
     HttpModule,

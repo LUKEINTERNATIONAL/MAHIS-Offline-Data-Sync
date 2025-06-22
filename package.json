@@ -11,7 +11,7 @@
         "test": "jest",
         "schema:generate": "node scripts/generate-schema.js",
         "prisma:generate": "npm run schema:generate && prisma generate",
-        "dev": "npm run schema:generate && npm run start:dev"
+        "dev": "npm run prisma:generate && npm run start:dev"
     },
     "prisma": {
         "schema": "src/modules/prisma/schema.prisma"

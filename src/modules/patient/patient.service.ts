@@ -105,7 +105,7 @@ export class PatientService {
         create: {
           patientID,
           message: data.message || '',
-          timestamp: data.timestamp,
+          timestamp: data.timestamp ? Number(data.timestamp) : undefined, // <-- fix here
           data: this.isSQLite ? JSON.stringify(data.data || {}) : (data.data || {}),
           ...updateData
         }
@@ -232,31 +232,31 @@ export class PatientService {
     duplicateCount: number;
   }> {
     try {
-      let whereClause: Prisma.PatientWhereInput;
+      let patients: Patient[] = [];
 
       if (this.isMongoDB) {
-        // MongoDB can query JSON fields directly
-        whereClause = {
-          data: {
-            path: ['ID'],
-            equals: dataId
-          }
-        } as any;
-      } else {
-        // SQLite - use JSON equality check for data.ID
-        whereClause = {
-          data: {
-            equals: {
-              ID: dataId
-            }
-          }
-        };
-      }
+        // For MongoDB, the patient "data" object uses "ID" as the key
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'Patient',
+          pipeline: [
+        { $match: { "data.ID": dataId } },
+        { $sort: { createdAt: -1 } }
+          ],
+          cursor: {}
+        });
 
-      const patients = await this.prisma.patient.findMany({
-        where: whereClause,
-        orderBy: { createdAt: 'desc' }
-      });
+        patients = (result?.cursor?.firstBatch as Patient[]) || [];
+      } else {
+        // For SQLite, the patient "data" object uses "id" as the key
+        patients = await this.prisma.patient.findMany({
+          where: {
+            data: {
+              contains: `"id":"${dataId}"`
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+      }
 
       const parsedPatients = patients.map(p => this.parsePatientData(p));
 

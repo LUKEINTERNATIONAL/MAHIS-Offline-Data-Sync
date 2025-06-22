@@ -6,11 +6,6 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor(private config: ConfigService) {
-    const dbProvider = config.get('DATABASE_PROVIDER');
-    const schemaPath = dbProvider === 'sqlite' 
-      ? './prisma/schema.sqlite.prisma' 
-      : './prisma/schema.prisma';
-    
     super({
       datasources: {
         db: {
