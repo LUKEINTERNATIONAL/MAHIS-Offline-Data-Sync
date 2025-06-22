@@ -105,7 +105,11 @@ export class PatientService {
         create: {
           patientID,
           message: data.message || '',
-          timestamp: data.timestamp ? Number(data.timestamp) : undefined, // <-- fix here
+          timestamp: data.timestamp
+            ? typeof data.timestamp === 'string'
+              ? Date.parse(data.timestamp)
+              : Number(data.timestamp)
+            : undefined,
           data: this.isSQLite ? JSON.stringify(data.data || {}) : (data.data || {}),
           ...updateData
         }
@@ -249,7 +253,7 @@ export class PatientService {
       } else {
         // For SQLite, the patient "data" object uses "id" as the key
         patients = await (this.prisma as any).$queryRaw<Patient[]>`
-          SELECT * FROM patient
+          SELECT * FROM patients
           WHERE json_extract(data, '$.id') = ${dataId}
           ORDER BY createdAt DESC
         `;

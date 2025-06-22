@@ -10,7 +10,7 @@ import { StageService } from './modules/stage/stage.service';
 export class PayloadDto {
   readonly message: string;
   readonly data?: any;
-  readonly timestamp?: number;
+  readonly timestamp?: any;
   readonly patientID?: string;
   readonly ID?: string;
 }

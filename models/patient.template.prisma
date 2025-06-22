@@ -9,7 +9,7 @@ model Patient {
   {{/if_sqlite}}
 
   message   String
-  timestamp Int?
+  timestamp String?
   patientID String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

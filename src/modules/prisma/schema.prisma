@@ -3,15 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model ConceptName {
   
-  id               String @id @default(auto()) @map("_id") @db.ObjectId
-  concept_name_id  Int    @unique
   
+  id               String @id @default(cuid())
+  concept_name_id  Int    @unique
   
 
   concept_id       Int
@@ -22,9 +22,9 @@ model ConceptName {
 
 model ConceptSet {
   
-  id             String @id @default(auto()) @map("_id") @db.ObjectId
-  concept_set_id Int    @unique
   
+  id             String @id @default(cuid())
+  concept_set_id Int    @unique
   
 
   concept_set_name String
@@ -36,9 +36,9 @@ model ConceptSet {
 
 model Country {
   
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  district_id Int
   
+  id          String @id @default(cuid())
+  district_id Int
   
 
   name          String
@@ -56,13 +56,13 @@ model Country {
 
 model DDE {
   
-  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+
+  
+  id        String      @id @default(cuid())
   npid      String      @unique
-  data      Json        // MongoDB: native JSON
+  data      String      // SQLite: JSON stored as TEXT
   status    DDEStatus?
   createdAt DateTime    @default(now())
-  
-
   
 
   @@map("dde")
@@ -76,9 +76,9 @@ enum DDEStatus {
 
 model Diagnosis {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  concept_id Int    @unique
   
+  id         String @id @default(cuid())
+  concept_id Int    @unique
   
 
   concept_name_id   Int?
@@ -100,9 +100,9 @@ model Diagnosis {
 
 model Drug {
   
-  id      String @id @default(auto()) @map("_id") @db.ObjectId
-  drug_id Int    @unique
   
+  id      String @id @default(cuid())
+  drug_id Int    @unique
   
 
   concept_id        Int?
@@ -125,9 +125,9 @@ model Drug {
 
 model Facility {
   
-  id           String @id @default(auto()) @map("_id") @db.ObjectId
-  facility_id  Int    @unique
   
+  id           String @id @default(cuid())
+  facility_id  Int    @unique
   
 
   code            String  @unique
@@ -147,13 +147,13 @@ model Facility {
 
 model Patient {
   
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  data      Json   // MongoDB native JSON
   
+  id        String @id @default(cuid())
+  data      String // SQLite stores JSON as TEXT
   
 
   message   String
-  timestamp Int?
+  timestamp String?
   patientID String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -164,9 +164,9 @@ model Patient {
 
 model Program {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  program_id Int    @unique
   
+  id         String @id @default(cuid())
+  program_id Int    @unique
   
 
   concept_id   Int
@@ -185,9 +185,9 @@ model Program {
 
 model Relationship {
   
-  id                   String @id @default(auto()) @map("_id") @db.ObjectId
-  relationship_type_id Int    @unique
   
+  id                   String @id @default(cuid())
+  relationship_type_id Int    @unique
   
 
   a_is_to_b     String
@@ -209,9 +209,9 @@ model Relationship {
 
 model ServerPatientCount {
   
-  id                   String @id @default(auto()) @map("_id") @db.ObjectId
-  server_patient_count Int
   
+  id                   Int    @id @default(autoincrement())
+  server_patient_count Int
   
 
   createdAt DateTime @default(now())
@@ -223,9 +223,9 @@ model ServerPatientCount {
 
 model Specimen {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  concept_id Int    @unique
   
+  id         String @id @default(cuid())
+  concept_id Int    @unique
   
 
   name String?
@@ -236,10 +236,10 @@ model Specimen {
 
 model Stage {
   
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  stage_id Int    @unique
-  data     Json   // MongoDB native JSON
   
+  id       String @id @default(cuid())
+  stage_id Int    @unique
+  data     String // SQLite stores JSON as TEXT
   
 
   @@map("stages")
@@ -248,9 +248,9 @@ model Stage {
 
 model Stock {
   
-  id                  String @id @default(auto()) @map("_id") @db.ObjectId
-  pharmacy_batch_id   Int    @unique
   
+  id                  String @id @default(cuid())
+  pharmacy_batch_id   Int    @unique
   
 
   barcode               String?
@@ -286,9 +286,9 @@ model Stock {
 
 model TestResultIndicator {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  concept_id Int    @unique
   
+  id         String @id @default(cuid())
+  concept_id Int    @unique
   
 
   test_type_id Int
@@ -300,9 +300,9 @@ model TestResultIndicator {
 
 model TestType {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  concept_id Int    @unique
   
+  id         String @id @default(cuid())
+  concept_id Int    @unique
   
 
   concept_set    Int?
@@ -315,9 +315,9 @@ model TestType {
 
 model TraditionalAuthority {
   
-  id                        String @id @default(auto()) @map("_id") @db.ObjectId
-  traditional_authority_id  Int    @unique
   
+  id                        String @id @default(cuid())
+  traditional_authority_id  Int    @unique
   
 
   name          String
@@ -335,9 +335,9 @@ model TraditionalAuthority {
 
 model User {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  user_id    Int    @unique
   
+  id         String @id @default(cuid())
+  user_id    Int    @unique
   
 
   locationId String
@@ -348,9 +348,9 @@ model User {
 
 model Village {
   
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  village_id Int    @unique
   
+  id         String @id @default(cuid())
+  village_id Int    @unique
   
 
   name                     String
@@ -363,10 +363,10 @@ model Village {
 
 model Visit {
   
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  visit_id Int    @unique
-  data     Json   // MongoDB native JSON
   
+  id       String @id @default(cuid())
+  visit_id Int    @unique
+  data     String // SQLite stores JSON as TEXT
   
 
   @@map("visits")
@@ -375,9 +375,9 @@ model Visit {
 
 model Ward {
   
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  location_id Int    @unique
   
+  id          String @id @default(cuid())
+  location_id Int    @unique
   
 
   uuid              String?
