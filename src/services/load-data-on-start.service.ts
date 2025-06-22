@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConceptSetService } from "../modules/conceptSet/concept-set.service";
 import { ConceptNameService } from "../modules/conceptName/concept-name.service";
-import { FacilityService } from "../modules/facilities/facilities.service";
+import { FacilitiesService } from "../modules/facilities/facilities.service";
 import { CountryService } from "../modules/country/country.service";
 import { DrugService } from "../modules/drugs/drug.service";
 import { RelationshipService } from "../modules/relationship/relationship.service";
@@ -9,7 +9,7 @@ import { WardService } from "../modules/wards/ward.service";
 import { TestTypeService } from "../modules/testTypes/test-type.service";
 import { TraditionalAuthorityService } from "../modules/traditionalAuthority/traditional-authority.service";
 import { VillageService } from "../modules/village/village.service";
-import { TestResultIndicatorService } from "../modules/testResultIndicator/res-result-indicator.service";
+import { TestResultIndicatorService } from "../modules/testResultIndicator/test-result-indicator.service";
 import { StockService } from "../modules/stock/stock.service";
 import { DiagnosisService } from "../modules/diagnosis/diagnosis.service";
 import { SpecimenService } from "../modules/specimen/specimen.service";
@@ -24,7 +24,7 @@ export class LoadDataOnStartService implements OnModuleInit {
   constructor(
     private conceptSetService: ConceptSetService,
     private conceptNameService: ConceptNameService,
-    private facilityService: FacilityService,
+    private facilitiesService: FacilitiesService,
     private countryService: CountryService,
     private drugService: DrugService,
     private relationshipService: RelationshipService,

@@ -1,44 +1,43 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Village, VillageDocument } from './schema/village.schema';
-import { ConfigService } from '@nestjs/config';
+import { Village, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
-import { lastValueFrom } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class VillageService {
   constructor(
-    @InjectModel(Village.name)
-    private villageModel: Model<VillageDocument>,
-    private configService: ConfigService,
-    private httpService: HttpService,
-    private authService: AuthService
+    private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+    private readonly authService: AuthService
   ) {}
 
-  async create(data: Partial<Village>): Promise<Village> {
-    return this.villageModel.create(data);
+  async create(data: Prisma.VillageCreateInput): Promise<Village> {
+    return this.prisma.village.create({ data });
   }
 
   async findAll(): Promise<Village[]> {
-    return this.villageModel.find().exec();
+    return this.prisma.village.findMany();
   }
 
-  async findById(village_id: number): Promise<Village | null> {
-    return this.villageModel.findOne({ village_id }).exec();
+  async findById(id: number): Promise<Village | null> {
+    return this.prisma.village.findUnique({ where: { village_id: id } });
   }
 
-  async update(village_id: number, data: Partial<Village>): Promise<Village | null> {
-    return this.villageModel.findOneAndUpdate({ village_id }, data, { new: true }).exec();
+  async update(id: number, data: Partial<Village>): Promise<Village | null> {
+    return this.prisma.village.update({
+      where: { village_id: id },
+      data,
+    });
   }
 
-  async delete(village_id: number): Promise<Village | null> {
-    return this.villageModel.findOneAndDelete({ village_id }).exec();
+  async delete(id: number): Promise<Village | null> {
+    return this.prisma.village.delete({ where: { village_id: id } });
   }
 
   async count(): Promise<number> {
-    return this.villageModel.countDocuments().exec();
+    return this.prisma.village.count();
   }
 
   async loadVillages(count?: number): Promise<void> {
@@ -47,8 +46,8 @@ export class VillageService {
       if (!isAuthenticated) {
         throw new Error('Failed to authenticate');
       }
-      const apiUrl = this.authService.getBaseUrl()
-      const token = this.authService.getAuthToken()
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken();
 
       // Fetch villages
       const villagesResponse$ = this.httpService.get(
@@ -70,11 +69,11 @@ export class VillageService {
       }
 
       // Clear existing
-      await this.villageModel.deleteMany({});
+      await this.prisma.village.deleteMany({});
 
       // Insert fresh
       if (villages.length > 0) {
-        await this.villageModel.insertMany(villages);
+        await this.prisma.village.createMany({ data: villages });
         console.log(`${villages.length} villages loaded.`);
       } else {
         console.log('No villages found.');

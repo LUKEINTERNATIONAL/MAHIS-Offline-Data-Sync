@@ -1,7 +1,5 @@
 import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
-
-import { TestResultIndicator } from './schema/test-result-indicator.schema';
-import { TestResultIndicatorService } from './res-result-indicator.service';
+import { TestResultIndicatorService } from './test-result-indicator.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 

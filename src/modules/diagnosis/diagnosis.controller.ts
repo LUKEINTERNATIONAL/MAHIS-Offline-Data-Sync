@@ -1,35 +1,27 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Put,
-  Delete,
-} from "@nestjs/common";
-import { DiagnosisService } from "./diagnosis.service";
-import { Diagnosis } from "./schema/diagnosis.schema";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
+import { DiagnosisService } from './diagnosis.service';
+import { Diagnosis } from '@prisma/client';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-@ApiTags("diagnoses")
-@Controller("diagnoses")
+@ApiTags('Diagnosis')
+@Controller('diagnosis')
 export class DiagnosisController {
   constructor(private readonly diagnosisService: DiagnosisService) {}
 
-  @Post()
-  async create(@Body() body: Partial<Diagnosis>) {
-    return this.diagnosisService.create(body);
-  }
+  // @Post()
+  // async create(@Body() body: Partial<Diagnosis>) {
+  //   return this.diagnosisService.create(body);
+  // }
 
   @Get()
-  @ApiOperation({ summary: "get all concept sets" })
-  @ApiResponse({ status: 200, description: "List all concept sets" })
-  async findAll() {
+  @ApiOperation({ summary: 'Get all diagnosis' })
+  @ApiResponse({ status: 200, description: 'List all diagnosis' })
+  async findAll(): Promise<Diagnosis[]> {
     return this.diagnosisService.findAll();
   }
 
   // @Get(':id')
-  // async findById(@Param('id') id: string) {
+  // async findById(@Param('id') id: string): Promise<Diagnosis | null> {
   //   return this.diagnosisService.findById(Number(id));
   // }
 

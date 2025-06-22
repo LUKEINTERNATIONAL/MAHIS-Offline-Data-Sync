@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
-import { TestType } from './schema/test-type.schema';
+import { TestType } from '@prisma/client';
 import { TestTypeService } from './test-type.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -16,14 +16,14 @@ export class TestTypeController {
   // }
 
   @Get()
-    @ApiOperation({ summary: "get all concept sets" })
-    @ApiResponse({ status: 200, description: 'List all concept sets' })
-  async findAll() {
+    @ApiOperation({ summary: "get all test types" })
+    @ApiResponse({ status: 200, description: 'List all test types' })
+  async findAll(): Promise<TestType[]> {
     return this.testTypeService.findAll();
   }
 
   // @Get(':id')
-  // async findById(@Param('id') id: string) {
+  // async findById(@Param('id') id: string): Promise<TestType | null> {
   //   return this.testTypeService.findById(Number(id));
   // }
 

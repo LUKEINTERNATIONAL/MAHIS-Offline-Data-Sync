@@ -15,7 +15,7 @@ import { TestTypeModule } from "./modules/testTypes/test-type.module";
 import { TestResultIndicatorModule } from "./modules/testResultIndicator/test-result-indicator.module";
 import { StockModule } from "./modules/stock/stock.module";
 import { RelationshipModule } from "./modules/relationship/relationship.module";
-import { FacilityModule } from "./modules/facilities/facilities.module";
+import { FacilitiesModule } from "./modules/facilities/facilities.module";
 import { DDEModule } from "./modules/dde/dde.module";
 import { VisitModule } from "./modules/visit/visit.module";
 import { StageModule } from "./modules/stage/stage.module";
@@ -72,7 +72,7 @@ async function bootstrap() {
       TestResultIndicatorModule,
       StockModule,
       RelationshipModule,
-      FacilityModule,
+      FacilitiesModule,
       DDEModule,
       VisitModule,
       StageModule,

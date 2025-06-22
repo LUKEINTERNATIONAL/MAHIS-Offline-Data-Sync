@@ -1,44 +1,45 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Facility, FacilityDocument } from './schema/facility.schema';
+import { Facility, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 
 @Injectable()
-export class FacilityService {
+export class FacilitiesService {
   constructor(
-    @InjectModel(Facility.name)
-    private facilityModel: Model<FacilityDocument>,
+    private readonly prisma: PrismaService,
     private configService: ConfigService,
     private httpService: HttpService,
     private authService: AuthService
   ) {}
 
-  async create(data: Partial<Facility>): Promise<Facility> {
-    return this.facilityModel.create(data);
+  async create(data: Prisma.FacilityCreateInput): Promise<Facility> {
+    return this.prisma.facility.create({ data });
   }
 
   async findAll(): Promise<Facility[]> {
-    return this.facilityModel.find().exec();
+    return this.prisma.facility.findMany();
   }
 
   async findById(id: number): Promise<Facility | null> {
-    return this.facilityModel.findOne({ id }).exec();
+    return this.prisma.facility.findUnique({ where: { id: id.toString() } });
   }
 
   async update(id: number, data: Partial<Facility>): Promise<Facility | null> {
-    return this.facilityModel.findOneAndUpdate({ id }, data, { new: true }).exec();
+    return this.prisma.facility.update({
+      where: { id: id.toString() },
+      data,
+    });
   }
 
   async delete(id: number): Promise<Facility | null> {
-    return this.facilityModel.findOneAndDelete({ id }).exec();
+    return this.prisma.facility.delete({ where: { id: id.toString() } });
   }
 
   async count(): Promise<number> {
-    return this.facilityModel.countDocuments().exec();
+    return this.prisma.facility.count();
   }
 
   async loadFacilities(count?: number): Promise<void> {
@@ -47,8 +48,8 @@ export class FacilityService {
       if (!isAuthenticated) {
         throw new Error('Failed to authenticate');
       }
-      const apiUrl = this.authService.getBaseUrl()
-      const token = this.authService.getAuthToken()
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken();
 
       // Fetch facilities
       const facilitiesResponse$ = this.httpService.get(
@@ -68,12 +69,12 @@ export class FacilityService {
         return;
       }
 
-      // Clear collection
-      await this.facilityModel.deleteMany({});
+      // Clear table
+      await this.prisma.facility.deleteMany({});
 
       // Bulk insert
       if (facilities.length > 0) {
-        await this.facilityModel.insertMany(facilities);
+        await this.prisma.facility.createMany({ data: facilities });
         console.log(`${facilities.length} facilities loaded.`);
       } else {
         console.log('No facilities found.');

@@ -1,19 +1,16 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-
-import { Program, ProgramSchema } from './schema/program.schema';
 import { ProgramController } from './program.controller';
 import { ProgramService } from './program.service';
 import { HttpModule } from '@nestjs/axios';
-
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Program.name, schema: ProgramSchema }]),
-    HttpModule
+    HttpModule,
+    AuthModule
   ],
   controllers: [ProgramController],
   providers: [ProgramService],
-//   exports: [ConceptNameService], 
+  exports: [ProgramService],
 })
 export class ProgramModule {}

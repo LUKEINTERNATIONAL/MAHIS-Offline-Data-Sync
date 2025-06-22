@@ -4,7 +4,7 @@ import { AuthService } from './app.authService';
 import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { lastValueFrom } from "rxjs";
-import { UserService } from './modules/user/user.service'; // Use Prisma service
+import { UserService } from './modules/user/user.service';
 
 @Injectable()
 export class VisitAndStagesSyncService {

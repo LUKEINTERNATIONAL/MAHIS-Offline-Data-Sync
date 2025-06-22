@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
 import { VillageService } from './village.service';
-import { Village } from './schema/village.schema';
+import { Village } from '@prisma/client';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 
@@ -17,22 +17,22 @@ export class VillageController {
   @Get()
     @ApiOperation({ summary: "get all villages" })
     @ApiResponse({ status: 200, description: 'List all villages' })
-  async findAll() {
+  async findAll(): Promise<Village[]> {
     return this.villageService.findAll();
   }
 
   // @Get(':id')
-  // async findById(@Param('id') id: string) {
+  // async findById(@Param('id') id: string): Promise<Village | null> {
   //   return this.villageService.findById(Number(id));
   // }
 
   // @Put(':id')
-  // async update(@Param('id') id: string, @Body() body: Partial<Village>) {
+  // async update(@Param('id') id: string, @Body() body: Partial<Village>): Promise<Village | null> {
   //   return this.villageService.update(Number(id), body);
   // }
 
   // @Delete(':id')
-  // async delete(@Param('id') id: string) {
+  // async delete(@Param('id') id: string): Promise<Village | null> {
   //   return this.villageService.delete(Number(id));
   // }
 }

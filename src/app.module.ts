@@ -21,7 +21,7 @@ import { TestResultIndicatorModule } from "./modules/testResultIndicator/test-re
 import { StockModule } from "./modules/stock/stock.module";
 import { ProgramModule } from "./modules/programs/program.module";
 import { TestTypeModule } from "./modules/testTypes/test-type.module";
-import { FacilityModule } from "./modules/facilities/facilities.module";
+import { FacilitiesModule } from "./modules/facilities/facilities.module";
 import { CountryModule } from "./modules/country/country.module";
 import { LoadDataOnStartService } from "./services/load-data-on-start.service";
 import { VillageModule } from "./modules/village/village.module";
@@ -66,7 +66,7 @@ import { PrismaModule } from "./modules/prisma/prisma.module";
     StockModule,
     ProgramModule,
     TestTypeModule,
-    FacilityModule, 
+    FacilitiesModule, 
     CountryModule,
     VillageModule,
     SpecimenModule,

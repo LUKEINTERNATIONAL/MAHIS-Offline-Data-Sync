@@ -1,34 +1,32 @@
 import { Injectable } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
-import { ConceptSet, ConceptSetDocument } from "./schema/concept-set.schema";
 import { HttpService } from "@nestjs/axios";
 import { lastValueFrom } from "rxjs";
 import { AuthService } from "../auth/auth.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { ConceptSet, Prisma } from "@prisma/client";
 
 @Injectable()
 export class ConceptSetService {
   constructor(
-    @InjectModel(ConceptSet.name)
-    private conceptSetModel: Model<ConceptSetDocument>,
-    private httpService: HttpService,
-    private authService: AuthService
+    private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+    private readonly authService: AuthService
   ) {}
 
-  async create(data: Partial<ConceptSet>): Promise<ConceptSet> {
-    return this.conceptSetModel.create(data);
+  async create(data: Prisma.ConceptSetCreateInput): Promise<ConceptSet> {
+    return this.prisma.conceptSet.create({ data });
   }
 
   async findAll(): Promise<ConceptSet[]> {
-    return this.conceptSetModel.find().exec();
+    return this.prisma.conceptSet.findMany();
   }
 
   async findById(id: number): Promise<ConceptSet | null> {
-    return this.conceptSetModel.findOne({ id }).exec();
+    return this.prisma.conceptSet.findUnique({ where: { id: id.toString() } });
   }
 
   async count(): Promise<number> {
-    return this.conceptSetModel.countDocuments().exec();
+    return this.prisma.conceptSet.count();
   }
 
   async loadConceptSet(expectedCount?: number): Promise<void> {
@@ -38,7 +36,7 @@ export class ConceptSetService {
         throw new Error('Failed to authenticate');
       }
       const apiUrl = this.authService.getBaseUrl();
-      const token = this.authService.getAuthToken()
+      const token = this.authService.getAuthToken();
 
       const conceptSetResponse$ = this.httpService.get(
         `${apiUrl}/concept_sets_ids?paginate=false`,
@@ -59,12 +57,12 @@ export class ConceptSetService {
         return;
       }
 
-      // Step 1: Clear the collection
-      await this.conceptSetModel.deleteMany({});
+      // Step 1: Clear the table
+      await this.prisma.conceptSet.deleteMany({});
 
       // Step 2: Insert all fetched concept sets
       if (conceptSets.length > 0) {
-        await this.conceptSetModel.insertMany(conceptSets);
+        await this.prisma.conceptSet.createMany({ data: conceptSets });
         console.log(`${conceptSets.length} concept sets loaded.`);
       } else {
         console.log("No concept sets found.");
