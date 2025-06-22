@@ -165,67 +165,268 @@ export class PatientService {
     return patients.map(p => p.patientID);
   }
 
-  async searchPatientData(
-    searchCriteria: { 
-      given_name?: string; 
-      family_name?: string; 
-      gender?: string;
-    },
-    pagination: {
-      page?: number;
-      per_page?: number;
-    } = {}
-  ): Promise<{
-    data: any[];
-    pagination: {
-      current_page: number;
-      per_page: number;
-      total: number;
-      total_pages: number;
-      has_next: boolean;
-      has_prev: boolean;
-    }
-  }> {
-    const page = pagination.page || 1;
-    const per_page = pagination.per_page || 10;
-    const skip = (page - 1) * per_page;
-
-    let whereClause: Prisma.PatientWhereInput = {};
-
-    if (this.isMongoDB) {
-      // MongoDB-specific search using JSON field queries
-      whereClause = this.buildMongoSearchQuery(searchCriteria);
-    } else {
-      // SQLite-specific search using JSON functions or text search
-      whereClause = this.buildSQLiteSearchQuery(searchCriteria);
-    }
-
-    this.logger.log(`Search criteria: ${JSON.stringify(searchCriteria)}`);
-    this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
-
-    const total = await this.prisma.patient.count({ where: whereClause });
-    
-    const patients = await this.prisma.patient.findMany({
-      where: whereClause,
-      select: { data: true },
-      skip,
-      take: per_page
-    });
-
-    const total_pages = Math.ceil(total / per_page);
-
-    return {
-      data: patients.map(patient => this.parsePatientData(patient as any).data),
-      pagination: {
-        current_page: page,
-        per_page: per_page,
-        total: total,
-        total_pages: total_pages,
-        has_next: page < total_pages,
-        has_prev: page > 1
-      }
-    };
+async searchPatientData(
+  searchCriteria: { 
+    given_name?: string; 
+    family_name?: string; 
+    gender?: string;
+  },
+  pagination: {
+    page?: number;
+    per_page?: number;
+  } = {}
+): Promise<{
+  data: any[];
+  pagination: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
   }
+}> {
+  const page = pagination.page || 1;
+  const per_page = pagination.per_page || 10;
+  const skip = (page - 1) * per_page;
+
+  this.logger.log(`Search criteria: ${JSON.stringify(searchCriteria)}`);
+  this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
+
+  // Get all patients first, then filter in memory
+  // This is less efficient but will work universally
+  const allPatients = await this.prisma.patient.findMany({
+    select: { 
+      id: true,
+      patientID: true,
+      data: true,
+      createdAt: true,
+      updatedAt: true,
+      message: true,
+      timestamp: true
+    }
+  });
+
+  // Parse and filter patients
+  const parsedPatients = allPatients.map(patient => this.parsePatientData(patient as any));
+  
+  const filteredPatients = parsedPatients.filter(patient => {
+    const patientData = patient.data as any;
+    
+    // Handle the case where data might not have personInformation
+    const personInfo = patientData?.personInformation || {};
+    
+    let matches = true;
+
+    if (searchCriteria.given_name) {
+      const givenNameInput = searchCriteria.given_name.toString().trim().toLowerCase();
+      const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
+      
+      if (isEntirelyNumeric) {
+        // Search by NcdID pattern
+        const ncdId = patientData?.NcdID || '';
+        matches = matches && ncdId.toLowerCase().includes(`-${givenNameInput}`);
+      } else {
+        // Search by given_name
+        const givenName = personInfo?.given_name || '';
+        matches = matches && givenName.toLowerCase().startsWith(givenNameInput);
+      }
+    }
+
+    if (searchCriteria.family_name && matches) {
+      const familyName = personInfo?.family_name || '';
+      const searchTerm = searchCriteria.family_name.toLowerCase();
+      matches = matches && familyName.toLowerCase().startsWith(searchTerm);
+    }
+
+    if (searchCriteria.gender && matches) {
+      const gender = personInfo?.gender || '';
+      const searchTerm = searchCriteria.gender.toLowerCase();
+      matches = matches && gender.toLowerCase().startsWith(searchTerm);
+    }
+
+    return matches;
+  });
+
+  // Apply pagination to filtered results
+  const total = filteredPatients.length;
+  const total_pages = Math.ceil(total / per_page);
+  const paginatedPatients = filteredPatients.slice(skip, skip + per_page);
+
+  return {
+    data: paginatedPatients.map(patient => patient.data),
+    pagination: {
+      current_page: page,
+      per_page: per_page,
+      total: total,
+      total_pages: total_pages,
+      has_next: page < total_pages,
+      has_prev: page > 1
+    }
+  };
+}
+
+// Alternative: Raw query approach for better performance (use this if the above works)
+async searchPatientDataWithRawQuery(
+  searchCriteria: { 
+    given_name?: string; 
+    family_name?: string; 
+    gender?: string;
+  },
+  pagination: {
+    page?: number;
+    per_page?: number;
+  } = {}
+): Promise<{
+  data: any[];
+  pagination: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  }
+}> {
+  const page = pagination.page || 1;
+  const per_page = pagination.per_page || 10;
+  const skip = (page - 1) * per_page;
+
+  let patients: any[] = [];
+  let total = 0;
+
+  if (this.isMongoDB) {
+    // MongoDB raw query approach
+    try {
+      const matchStage: any = {};
+      
+      if (searchCriteria.given_name) {
+        const givenNameInput = searchCriteria.given_name.toString().trim();
+        const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
+        
+        if (isEntirelyNumeric) {
+          matchStage["data.NcdID"] = { $regex: `-${givenNameInput}`, $options: 'i' };
+        } else {
+          matchStage["data.personInformation.given_name"] = { 
+            $regex: `^${givenNameInput}`, 
+            $options: 'i' 
+          };
+        }
+      }
+
+      if (searchCriteria.family_name) {
+        matchStage["data.personInformation.family_name"] = { 
+          $regex: `^${searchCriteria.family_name}`, 
+          $options: 'i' 
+        };
+      }
+
+      if (searchCriteria.gender) {
+        matchStage["data.personInformation.gender"] = { 
+          $regex: `^${searchCriteria.gender}`, 
+          $options: 'i' 
+        };
+      }
+
+      // Get total count
+      const countResult = await (this.prisma as any).$runCommandRaw({
+        aggregate: 'Patient',
+        pipeline: [
+          { $match: matchStage },
+          { $count: "total" }
+        ],
+        cursor: {}
+      });
+      
+      total = countResult?.cursor?.firstBatch?.[0]?.total || 0;
+
+      // Get paginated results  
+      const result = await (this.prisma as any).$runCommandRaw({
+        aggregate: 'Patient',
+        pipeline: [
+          { $match: matchStage },
+          { $sort: { createdAt: -1 } },
+          { $skip: skip },
+          { $limit: per_page }
+        ],
+        cursor: {}
+      });
+
+      patients = (result?.cursor?.firstBatch || []);
+    } catch (error) {
+      this.logger.error('MongoDB raw query failed, falling back to memory search:', error);
+      return this.searchPatientData(searchCriteria, pagination);
+    }
+  } else {
+    // SQLite raw query approach
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      
+      if (searchCriteria.given_name) {
+        const givenNameInput = searchCriteria.given_name.toString().trim();
+        const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
+        
+        if (isEntirelyNumeric) {
+          conditions.push(`json_extract(data, '$.NcdID') LIKE ?`);
+          params.push(`%-${givenNameInput}%`);
+        } else {
+          conditions.push(`json_extract(data, '$.personInformation.given_name') LIKE ?`);
+          params.push(`${givenNameInput}%`);
+        }
+      }
+
+      if (searchCriteria.family_name) {
+        conditions.push(`json_extract(data, '$.personInformation.family_name') LIKE ?`);
+        params.push(`${searchCriteria.family_name}%`);
+      }
+
+      if (searchCriteria.gender) {
+        conditions.push(`json_extract(data, '$.personInformation.gender') LIKE ?`);
+        params.push(`${searchCriteria.gender}%`);
+      }
+
+      if (conditions.length > 0) {
+        const whereClause = conditions.join(' AND ');
+        
+        // Get total count
+        const countQuery = `SELECT COUNT(*) as total FROM patients WHERE ${whereClause}`;
+        const countResult = await (this.prisma as any).$queryRawUnsafe(countQuery, ...params);
+        total = countResult[0]?.total || 0;
+
+        // Get paginated results
+        const dataQuery = `SELECT * FROM patients WHERE ${whereClause} ORDER BY createdAt DESC LIMIT ? OFFSET ?`;
+        patients = await (this.prisma as any).$queryRawUnsafe(dataQuery, ...params, per_page, skip);
+      } else {
+        // No search criteria
+        total = await this.prisma.patient.count();
+        patients = await this.prisma.patient.findMany({
+          skip,
+          take: per_page,
+          orderBy: { createdAt: 'desc' }
+        });
+      }
+    } catch (error) {
+      this.logger.error('SQLite raw query failed, falling back to memory search:', error);
+      return this.searchPatientData(searchCriteria, pagination);
+    }
+  }
+
+  const total_pages = Math.ceil(total / per_page);
+  const parsedPatients = patients.map(patient => this.parsePatientData(patient));
+
+  return {
+    data: parsedPatients.map(patient => patient.data),
+    pagination: {
+      current_page: page,
+      per_page: per_page,
+      total: total,
+      total_pages: total_pages,
+      has_next: page < total_pages,
+      has_prev: page > 1
+    }
+  };
+}
 
   async findDuplicatesByDataId(dataId: string): Promise<{
     patients: Patient[];
@@ -358,90 +559,5 @@ export class PatientService {
     }
     
     return updateData;
-  }
-
-  private buildMongoSearchQuery(searchCriteria: any): Prisma.PatientWhereInput {
-    const conditions: any[] = [];
-
-    if (searchCriteria.given_name) {
-      const givenNameInput = searchCriteria.given_name.toString().trim();
-      const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
-      
-      if (isEntirelyNumeric) {
-        // Search by NcdID pattern
-        conditions.push({
-          data: {
-            path: ['NcdID'],
-            string_ends_with: `-${givenNameInput}`
-          }
-        });
-      } else {
-        // Search by given_name
-        conditions.push({
-          data: {
-            path: ['personInformation', 'given_name'],
-            string_starts_with: givenNameInput
-          }
-        });
-      }
-    }
-
-    if (searchCriteria.family_name) {
-      conditions.push({
-        data: {
-          path: ['personInformation', 'family_name'],
-          string_starts_with: searchCriteria.family_name
-        }
-      });
-    }
-
-    if (searchCriteria.gender) {
-      conditions.push({
-        data: {
-          path: ['personInformation', 'gender'],
-          string_starts_with: searchCriteria.gender
-        }
-      });
-    }
-
-    return conditions.length > 0 ? { AND: conditions } : {};
-  }
-
-  private buildSQLiteSearchQuery(searchCriteria: any): Prisma.PatientWhereInput {
-    // For SQLite, we'll use simpler text search in the JSON string
-    // In a production system, you might want to use SQLite's JSON functions
-    const searchTerms: string[] = [];
-
-    if (searchCriteria.given_name) {
-      const givenNameInput = searchCriteria.given_name.toString().trim();
-      const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
-      
-      if (isEntirelyNumeric) {
-        searchTerms.push(`-${givenNameInput}`);
-      } else {
-        searchTerms.push(givenNameInput);
-      }
-    }
-
-    if (searchCriteria.family_name) {
-      searchTerms.push(searchCriteria.family_name);
-    }
-
-    if (searchCriteria.gender) {
-      searchTerms.push(searchCriteria.gender);
-    }
-
-    if (searchTerms.length === 0) {
-      return {};
-    }
-
-    // Simple contains search across all terms
-    return {
-      AND: searchTerms.map(term => ({
-        data: {
-          contains: term
-        }
-      }))
-    } as Prisma.PatientWhereInput;
   }
 }
