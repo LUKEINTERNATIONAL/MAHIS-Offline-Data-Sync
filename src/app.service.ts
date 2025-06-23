@@ -31,13 +31,14 @@ export class AppService {
         
         if (!patientId) {
           try {
-            const newPatientFromPayload = await this.dataSyncService.syncPatientRecordWithPayload(payloadDto);
+            console.log(JSON.stringify(payloadDto))
+            const newPatientFromPayload = await this.dataSyncService.syncPatientRecordWithPayload(payloadDto, true);
 
             // Create new patient record using PatientService
             const newPatient = await this.patientService.create({
               patientID: newPatientFromPayload.ID,
               data: newPatientFromPayload,
-              timestamp: payloadDto.timestamp || Date.now(),
+              timestamp:  new Date().toISOString() as any,
               message: 'Received payload'
             });
 
@@ -97,7 +98,7 @@ export class AppService {
               patientId,
               { 
                 data: result.mergedData,
-                timestamp: payloadDto.timestamp || Date.now(),
+                timestamp:  new Date().toISOString() as any,
                 message: 'Updated payload'
               }
             );
@@ -113,7 +114,7 @@ export class AppService {
               message: 'Payload updated successfully',
               id: updatedPatient.id,
               patientID: updatedPatient.patientID,
-              timestamp: new Date().toISOString(),
+              timestamp:  new Date().toISOString() as any,
               updated: true,
               record: patient_result,
               hasChanges: hasChanges,
@@ -146,7 +147,7 @@ export class AppService {
             const newPatient = await this.patientService.create({
               patientID: patientId,
               data: payloadDto as any, // Cast to handle JsonValue type compatibility
-              timestamp: payloadDto.timestamp || Date.now(),
+              timestamp:  new Date().toISOString() as any,
               message: 'Received payload'
             });
 
