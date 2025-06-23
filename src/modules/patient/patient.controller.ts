@@ -45,7 +45,7 @@ export class PatientController {
       per_page: per_page ? parseInt(per_page, 10) : 10,
     };
 
-    return await this.patientService.searchPatientData(searchCriteria, pagination);
+    return await this.patientService.searchPatientDataWithRawQuery(searchCriteria, pagination);
   }
 
   // Find duplicates by data ID

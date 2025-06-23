@@ -107,6 +107,6 @@ async getPatientPayload(@Param('patientId') patientId: string) {
       per_page: per_page ? parseInt(per_page, 10) : 10
     };
     
-    return this.patientService.searchPatientData(searchCriteria, pagination);
+    return this.patientService.searchPatientDataWithRawQuery(searchCriteria, pagination);
   }
 }

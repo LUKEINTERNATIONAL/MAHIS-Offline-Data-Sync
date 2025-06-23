@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { Patient, Prisma } from '@prisma/client';
+import * as _ from 'lodash';
 
 @Injectable()
 export class PatientService {
@@ -23,7 +24,9 @@ export class PatientService {
     const createData: Prisma.PatientCreateInput = {
       patientID: data.patientID!,
       message: data.message || '',
-      data: this.isSQLite ? JSON.stringify(data.data) : data.data,
+      data: this.isSQLite
+        ? (typeof data.data === 'string' ? data.data : JSON.stringify(data.data))
+        : data.data,
     };
 
     const patient = await this.prisma.patient.create({ data: createData });
@@ -87,10 +90,9 @@ export class PatientService {
           // For SQLite, merge with existing JSON data
           const existingPatient = await this.findByPatientId(patientID);
           if (existingPatient) {
-            const existingData = existingPatient.data as any;
-            updateData.data = JSON.stringify({ ...existingData, ...data.data });
+            updateData.data = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
           } else {
-            updateData.data = JSON.stringify(data.data);
+            updateData.data = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
           }
         }
       }
@@ -108,7 +110,9 @@ export class PatientService {
               ? data.timestamp
               : data.timestamp
             : undefined,
-          data: this.isSQLite ? JSON.stringify(data.data || {}) : (data.data || {}),
+          data: this.isSQLite
+            ? (typeof data.data === 'string' ? data.data : JSON.stringify(data.data || {}))
+            : (data.data || {}),
         } as any
       });
       
@@ -165,108 +169,6 @@ export class PatientService {
     return patients.map(p => p.patientID);
   }
 
-async searchPatientData(
-  searchCriteria: { 
-    given_name?: string; 
-    family_name?: string; 
-    gender?: string;
-  },
-  pagination: {
-    page?: number;
-    per_page?: number;
-  } = {}
-): Promise<{
-  data: any[];
-  pagination: {
-    current_page: number;
-    per_page: number;
-    total: number;
-    total_pages: number;
-    has_next: boolean;
-    has_prev: boolean;
-  }
-}> {
-  const page = pagination.page || 1;
-  const per_page = pagination.per_page || 10;
-  const skip = (page - 1) * per_page;
-
-  this.logger.log(`Search criteria: ${JSON.stringify(searchCriteria)}`);
-  this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
-
-  // Get all patients first, then filter in memory
-  // This is less efficient but will work universally
-  const allPatients = await this.prisma.patient.findMany({
-    select: { 
-      id: true,
-      patientID: true,
-      data: true,
-      createdAt: true,
-      updatedAt: true,
-      message: true,
-      timestamp: true
-    }
-  });
-
-  // Parse and filter patients
-  const parsedPatients = allPatients.map(patient => this.parsePatientData(patient as any));
-  
-  const filteredPatients = parsedPatients.filter(patient => {
-    const patientData = patient.data as any;
-    
-    // Handle the case where data might not have personInformation
-    const personInfo = patientData?.personInformation || {};
-    
-    let matches = true;
-
-    if (searchCriteria.given_name) {
-      const givenNameInput = searchCriteria.given_name.toString().trim().toLowerCase();
-      const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
-      
-      if (isEntirelyNumeric) {
-        // Search by NcdID pattern
-        const ncdId = patientData?.NcdID || '';
-        matches = matches && ncdId.toLowerCase().includes(`-${givenNameInput}`);
-      } else {
-        // Search by given_name
-        const givenName = personInfo?.given_name || '';
-        matches = matches && givenName.toLowerCase().startsWith(givenNameInput);
-      }
-    }
-
-    if (searchCriteria.family_name && matches) {
-      const familyName = personInfo?.family_name || '';
-      const searchTerm = searchCriteria.family_name.toLowerCase();
-      matches = matches && familyName.toLowerCase().startsWith(searchTerm);
-    }
-
-    if (searchCriteria.gender && matches) {
-      const gender = personInfo?.gender || '';
-      const searchTerm = searchCriteria.gender.toLowerCase();
-      matches = matches && gender.toLowerCase().startsWith(searchTerm);
-    }
-
-    return matches;
-  });
-
-  // Apply pagination to filtered results
-  const total = filteredPatients.length;
-  const total_pages = Math.ceil(total / per_page);
-  const paginatedPatients = filteredPatients.slice(skip, skip + per_page);
-
-  return {
-    data: paginatedPatients.map(patient => patient.data),
-    pagination: {
-      current_page: page,
-      per_page: per_page,
-      total: total,
-      total_pages: total_pages,
-      has_next: page < total_pages,
-      has_prev: page > 1
-    }
-  };
-}
-
-// Alternative: Raw query approach for better performance (use this if the above works)
 async searchPatientDataWithRawQuery(
   searchCriteria: { 
     given_name?: string; 
@@ -294,6 +196,9 @@ async searchPatientDataWithRawQuery(
 
   let patients: any[] = [];
   let total = 0;
+
+  this.logger.log(`Search criteria: ${JSON.stringify(searchCriteria)}`);
+  this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
 
   if (this.isMongoDB) {
     // MongoDB raw query approach
@@ -330,7 +235,7 @@ async searchPatientDataWithRawQuery(
 
       // Get total count
       const countResult = await (this.prisma as any).$runCommandRaw({
-        aggregate: 'Patient',
+        aggregate: 'patients',
         pipeline: [
           { $match: matchStage },
           { $count: "total" }
@@ -342,7 +247,7 @@ async searchPatientDataWithRawQuery(
 
       // Get paginated results  
       const result = await (this.prisma as any).$runCommandRaw({
-        aggregate: 'Patient',
+        aggregate: 'patients',
         pipeline: [
           { $match: matchStage },
           { $sort: { createdAt: -1 } },
@@ -355,7 +260,6 @@ async searchPatientDataWithRawQuery(
       patients = (result?.cursor?.firstBatch || []);
     } catch (error) {
       this.logger.error('MongoDB raw query failed, falling back to memory search:', error);
-      return this.searchPatientData(searchCriteria, pagination);
     }
   } else {
     // SQLite raw query approach
@@ -364,35 +268,37 @@ async searchPatientDataWithRawQuery(
       const params: any[] = [];
       
       if (searchCriteria.given_name) {
-        const givenNameInput = searchCriteria.given_name.toString().trim();
+        const givenNameInput = searchCriteria.given_name.toString().trim().toLowerCase();
         const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
-        
+
         if (isEntirelyNumeric) {
-          conditions.push(`json_extract(data, '$.NcdID') LIKE ?`);
+          conditions.push(`LOWER(json_extract(data, '$.NcdID')) LIKE ?`);
           params.push(`%-${givenNameInput}%`);
         } else {
-          conditions.push(`json_extract(data, '$.personInformation.given_name') LIKE ?`);
+          conditions.push(`LOWER(json_extract(data, '$.personInformation.given_name')) LIKE ?`);
           params.push(`${givenNameInput}%`);
         }
       }
 
+
       if (searchCriteria.family_name) {
-        conditions.push(`json_extract(data, '$.personInformation.family_name') LIKE ?`);
-        params.push(`${searchCriteria.family_name}%`);
+        conditions.push(`LOWER(json_extract(data, '$.personInformation.family_name')) LIKE ?`);
+        params.push(`${searchCriteria.family_name.toLowerCase()}%`);
       }
 
       if (searchCriteria.gender) {
-        conditions.push(`json_extract(data, '$.personInformation.gender') LIKE ?`);
-        params.push(`${searchCriteria.gender}%`);
+        conditions.push(`LOWER(json_extract(data, '$.personInformation.gender')) LIKE ?`);
+        params.push(`${searchCriteria.gender.toLowerCase()}%`);
       }
 
       if (conditions.length > 0) {
+       
         const whereClause = conditions.join(' AND ');
         
         // Get total count
         const countQuery = `SELECT COUNT(*) as total FROM patients WHERE ${whereClause}`;
         const countResult = await (this.prisma as any).$queryRawUnsafe(countQuery, ...params);
-        total = countResult[0]?.total || 0;
+        total = countResult[0]?.total ? Number(countResult[0].total) : 0;
 
         // Get paginated results
         const dataQuery = `SELECT * FROM patients WHERE ${whereClause} ORDER BY createdAt DESC LIMIT ? OFFSET ?`;
@@ -408,7 +314,6 @@ async searchPatientDataWithRawQuery(
       }
     } catch (error) {
       this.logger.error('SQLite raw query failed, falling back to memory search:', error);
-      return this.searchPatientData(searchCriteria, pagination);
     }
   }
 
@@ -555,7 +460,7 @@ async searchPatientDataWithRawQuery(
     const updateData: Prisma.PatientUpdateInput = { ...data };
     
     if (this.isSQLite && data.data) {
-      updateData.data = JSON.stringify(data.data);
+      updateData.data = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
     }
     
     return updateData;

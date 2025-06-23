@@ -77,21 +77,21 @@ async checkPatientCountChanges() {
   if (!this.isEnabled) return;
   
   try {
-    await updateIfSitePatientCountChanges(
-      this.authService,
-      this.httpService, 
-      this.logger,
-      this.serverPatientCountService,
-      () => syncPatientIds(
-        this.authService,
-        this.httpService,
-        this.logger,
-        this.patientService,
-        this.ddeService
-      )
-    );
-    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
-    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    // await updateIfSitePatientCountChanges(
+    //   this.authService,
+    //   this.httpService, 
+    //   this.logger,
+    //   this.serverPatientCountService,
+    //   () => syncPatientIds(
+    //     this.authService,
+    //     this.httpService,
+    //     this.logger,
+    //     this.patientService,
+    //     this.ddeService
+    //   )
+    // );
+    // await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    // await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
 
   } catch (error) {
     this.logger.error(`Patient count check failed: ${error.message}`);
