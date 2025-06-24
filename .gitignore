@@ -139,3 +139,4 @@ dist
 /src/modules/prisma/MONDS.db
 /src/modules/prisma/schema.prisma
 database.sqlite
+/storage
