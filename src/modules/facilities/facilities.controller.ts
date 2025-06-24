@@ -7,39 +7,39 @@ import {
   Put,
   Delete,
 } from "@nestjs/common";
-import { FacilityService } from "./facilities.service";
-import { Facility } from "./schema/facility.schema";
+import { FacilitiesService } from "./facilities.service";
+import { Facility } from "@prisma/client";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("facilities")
 @Controller("facilities")
-export class FacilityController {
-  constructor(private readonly facilityService: FacilityService) {}
+export class FacilitiesController {
+  constructor(private readonly facilitiesService: FacilitiesService) {}
 
   // @Post()
   // async create(@Body() body: Partial<Facility>) {
-  //   return this.facilityService.create(body);
+  //   return this.facilitiesService.create(body);
   // }
 
   @Get()
   @ApiOperation({ summary: "get all facilities" })
   @ApiResponse({ status: 200, description: "List all facilities" })
-  async findAll() {
-    return this.facilityService.findAll();
+  async findAll(): Promise<Facility[]> {
+    return this.facilitiesService.findAll();
   }
 
   // @Get(':id')
-  // async findById(@Param('id') id: string) {
-  //   return this.facilityService.findById(Number(id));
+  // async findById(@Param('id') id: string): Promise<Facility | null> {
+  //   return this.facilitiesService.findById(Number(id));
   // }
 
   // @Put(':id')
-  // async update(@Param('id') id: string, @Body() body: Partial<Facility>) {
-  //   return this.facilityService.update(Number(id), body);
+  // async update(@Param('id') id: string, @Body() body: Partial<Facility>): Promise<Facility | null> {
+  //   return this.facilitiesService.update(Number(id), body);
   // }
 
   // @Delete(':id')
-  // async delete(@Param('id') id: string) {
-  //   return this.facilityService.delete(Number(id));
+  // async delete(@Param('id') id: string): Promise<Facility | null> {
+  //   return this.facilitiesService.delete(Number(id));
   // }
 }

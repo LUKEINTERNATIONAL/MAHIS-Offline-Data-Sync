@@ -1,0 +1,22 @@
+model Program {
+  {{#if_mongodb}}
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  program_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id         String @id @default(cuid())
+  program_id Int    @unique
+  {{/if_sqlite}}
+
+  concept_id   Int
+  name         String
+  description  String?
+  creator      Int?
+  changed_by   Int?
+  date_created DateTime?
+  date_changed DateTime?
+  retired      Boolean @default(false)
+  uuid         String  @unique
+
+  @@map("programs")
+}

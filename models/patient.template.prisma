@@ -1,0 +1,18 @@
+model Patient {
+  {{#if_mongodb}}
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  data      Json   // MongoDB native JSON
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id        String @id @default(cuid())
+  data      String // SQLite stores JSON as TEXT
+  {{/if_sqlite}}
+
+  message   String
+  timestamp String?
+  patientID String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("patients")
+}

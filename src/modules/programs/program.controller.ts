@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Put,
-  Delete,
-} from "@nestjs/common";
-import { ProgramService } from "./program.service";
-import { Program } from "./schema/program.schema";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
+import { ProgramService } from './program.service';
+import { Program } from '@prisma/client';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-@ApiTags("programs")
-@Controller("programs")
+@ApiTags('Programs')
+@Controller('programs')
 export class ProgramController {
   constructor(private readonly programService: ProgramService) {}
 
@@ -22,24 +14,11 @@ export class ProgramController {
   // }
 
   @Get()
-  @ApiOperation({ summary: "get all programs" })
-  @ApiResponse({ status: 200, description: "List all programs" })
-  async findAll() {
+  @ApiOperation({ summary: 'Get all programs' })
+  @ApiResponse({ status: 200, description: 'List all programs' })
+  async findAll(): Promise<Program[]> {
     return this.programService.findAll();
   }
 
-  // @Get(':id')
-  // async findById(@Param('id') id: string) {
-  //   return this.programService.findById(Number(id));
-  // }
-
-  // @Put(':id')
-  // async update(@Param('id') id: string, @Body() body: Partial<Program>) {
-  //   return this.programService.update(Number(id), body);
-  // }
-
-  // @Delete(':id')
-  // async delete(@Param('id') id: string) {
-  //   return this.programService.delete(Number(id));
-  // }
+  // Add other endpoints as needed...
 }

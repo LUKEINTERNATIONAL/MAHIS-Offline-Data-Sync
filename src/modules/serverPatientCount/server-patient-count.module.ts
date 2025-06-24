@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { ServerPatientCountSchema, ServerPatientCount } from './schema/server-patient-count.schema';
+import { PrismaModule } from '../prisma/prisma.module';
+import { ServerPatientCountService } from './server-patient-count.service';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: ServerPatientCount.name, schema: ServerPatientCountSchema }])
-  ],
-  exports: [MongooseModule]
+  imports: [PrismaModule],
+  providers: [ServerPatientCountService],
+  exports: [ServerPatientCountService]
 })
 export class ServerPatientCountModule {}

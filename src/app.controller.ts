@@ -1,5 +1,5 @@
 // app.controller.ts
-import { Controller, Post, Body, Get, Header, Param, NotFoundException, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
@@ -10,7 +10,7 @@ import { StageService } from './modules/stage/stage.service';
 export class PayloadDto {
   readonly message: string;
   readonly data?: any;
-  readonly timestamp?: number;
+  readonly timestamp?: any;
   readonly patientID?: string;
   readonly ID?: string;
 }
@@ -44,13 +44,26 @@ export class AppController {
   }
 
   @Get('patient/:patientId/payload')
-  async getPatientPayload(@Param('patientId') patientId: string) {
-    const payload = await this.appService.getPatientPayload(patientId);
-    if (!payload) {
-      throw new NotFoundException(`Payload not found for patient ID ${patientId}`);
-    }
-    return payload.data;
+async getPatientPayload(@Param('patientId') patientId: string) {
+  const payload = await this.appService.getPatientPayload(patientId);
+
+  if (!payload || !payload.data) {
+    throw new NotFoundException(`Payload not found for patient ID ${patientId}`);
   }
+
+  try {
+    // If payload.data is already an object, this won't throw.
+    // If it's a JSON string, this will parse it.
+    const parsedData = typeof payload.data === 'string'
+      ? JSON.parse(payload.data)
+      : payload.data;
+
+    return parsedData;
+  } catch (error) {
+    throw new BadRequestException(`Invalid JSON data for patient ID ${patientId}`);
+  }
+}
+
 
   @Get('test-connection')
   testConnection() {
@@ -94,6 +107,6 @@ export class AppController {
       per_page: per_page ? parseInt(per_page, 10) : 10
     };
     
-    return this.patientService.searchPatientData(searchCriteria, pagination);
+    return this.patientService.searchPatientDataWithRawQuery(searchCriteria, pagination);
   }
 }

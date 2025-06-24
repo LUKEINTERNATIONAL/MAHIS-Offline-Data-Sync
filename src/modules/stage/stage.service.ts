@@ -1,15 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Stage, StageDocument } from './schema/stage.schema';
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export interface CreateStageDto {
-  id: number;
+  stage_id: number; // Changed from 'id' to match Prisma schema
   data?: any;
 }
 
 export interface UpdateStageDto {
-  id?: number;
+  stage_id?: number;
   data?: any;
 }
 
@@ -21,172 +20,244 @@ export interface StageQueryOptions {
 
 @Injectable()
 export class StageService {
-  private readonly Stagelogger = new Logger(StageService.name);
-  constructor(
-    @InjectModel(Stage.name) private stageModel: Model<StageDocument>
-  ) {}
+  private readonly logger = new Logger(StageService.name);
+
+  constructor(private prisma: PrismaService) {}
 
   // Create a new stage or update if exists
-  async create(createStageDto: CreateStageDto): Promise<Stage> {
+  async create(createStageDto: CreateStageDto) {
     try {
-      // Check if stage with same id already exists
-      const existingStage = await this.stageModel.findOne({ id: createStageDto.id });
+      // Check if stage with same stage_id already exists
+      const existingStage = await this.prisma.stage.findUnique({
+        where: { stage_id: createStageDto.stage_id }
+      });
+
       if (existingStage) {
-        this.Stagelogger.warn(`Stage with id ${createStageDto.id} already exists, updating instead`);
-        return await this.updateByStageId(createStageDto.id, createStageDto);
+        this.logger.warn(`Stage with stage_id ${createStageDto.stage_id} already exists, updating instead`);
+        return await this.updateByStageId(createStageDto.stage_id, createStageDto);
       }
 
-      const createdStage = new this.stageModel(createStageDto);
-      return await createdStage.save();
+      // Handle data serialization based on database type
+      const stageData = {
+        stage_id: createStageDto.stage_id,
+        data: this.serializeData(createStageDto.data)
+      };
+
+      return await this.prisma.stage.create({
+        data: stageData
+      });
     } catch (error) {
-      this.Stagelogger.error(`Failed to create stage: ${error.message}`, error.stack);
+      this.logger.error(`Failed to create stage: ${error.message}`, error.stack);
       return null;
     }
   }
 
   // Find all stages with optional query options
-  async findAll(options?: StageQueryOptions): Promise<Stage[]> {
+  async findAll(options?: StageQueryOptions) {
     try {
-      let query = this.stageModel.find();
-
-      if (options?.sort) {
-        query = query.sort(options.sort);
-      }
+      const queryOptions: Prisma.StageFindManyArgs = {};
 
       if (options?.skip) {
-        query = query.skip(options.skip);
+        queryOptions.skip = options.skip;
       }
 
       if (options?.limit) {
-        query = query.limit(options.limit);
+        queryOptions.take = options.limit;
       }
 
-      return await query.exec();
+      if (options?.sort) {
+        // Convert Mongoose sort format to Prisma orderBy
+        queryOptions.orderBy = this.convertSortToPrisma(options.sort);
+      }
+
+      const stages = await this.prisma.stage.findMany(queryOptions);
+      
+      // Deserialize data for each stage
+      return stages.map(stage => ({
+        ...stage,
+        data: this.deserializeData(stage.data)
+      }));
     } catch (error) {
-      this.Stagelogger.error(`Failed to fetch stages: ${error.message}`, error.stack);
+      this.logger.error(`Failed to fetch stages: ${error.message}`, error.stack);
       return [];
     }
   }
 
-  // Find stage by MongoDB ObjectId
-  async findById(id: string): Promise<Stage> {
+  // Find stage by Prisma ID
+  async findById(id: string) {
     try {
-      const stage = await this.stageModel.findById(id);
+      const stage = await this.prisma.stage.findUnique({
+        where: { id }
+      });
+
       if (!stage) {
-        this.Stagelogger.warn(`Stage with ID ${id} not found`);
+        this.logger.warn(`Stage with ID ${id} not found`);
         return null;
       }
-      return stage;
+
+      return {
+        ...stage,
+        data: this.deserializeData(stage.data)
+      };
     } catch (error) {
-      this.Stagelogger.error(`Failed to find stage by ID ${id}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to find stage by ID ${id}: ${error.message}`, error.stack);
       return null;
     }
   }
 
-  // Find stage by custom id field
-  async findByStageId(stageId: number): Promise<Stage> {
+  // Find stage by stage_id
+  async findByStageId(stageId: number) {
     try {
-      const stage = await this.stageModel.findOne({ id: stageId });
+      const stage = await this.prisma.stage.findUnique({
+        where: { stage_id: stageId }
+      });
+
       if (!stage) {
-        this.Stagelogger.warn(`Stage with stage ID ${stageId} not found`);
+        this.logger.warn(`Stage with stage_id ${stageId} not found`);
         return null;
       }
-      return stage;
+
+      return {
+        ...stage,
+        data: this.deserializeData(stage.data)
+      };
     } catch (error) {
-      this.Stagelogger.error(`Failed to find stage by stage ID ${stageId}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to find stage by stage_id ${stageId}: ${error.message}`, error.stack);
       return null;
     }
   }
 
-  // Update stage by MongoDB ObjectId
-  async updateById(id: string, updateStageDto: UpdateStageDto): Promise<Stage> {
+  // Update stage by Prisma ID
+  async updateById(id: string, updateStageDto: UpdateStageDto) {
     try {
-      // If updating the stage id, check for conflicts
-      if (updateStageDto.id !== undefined) {
-        const existingStage = await this.stageModel.findOne({ 
-          id: updateStageDto.id,
-          _id: { $ne: id }
+      // If updating the stage_id, check for conflicts
+      if (updateStageDto.stage_id !== undefined) {
+        const existingStage = await this.prisma.stage.findFirst({
+          where: {
+            stage_id: updateStageDto.stage_id,
+            NOT: { id }
+          }
         });
+
         if (existingStage) {
-          this.Stagelogger.warn(`Stage with id ${updateStageDto.id} already exists, skipping update`);
-          return existingStage;
+          this.logger.warn(`Stage with stage_id ${updateStageDto.stage_id} already exists, skipping update`);
+          return {
+            ...existingStage,
+            data: this.deserializeData(existingStage.data)
+          };
         }
       }
 
-      const updatedStage = await this.stageModel.findByIdAndUpdate(
-        id,
-        updateStageDto,
-        { new: true, runValidators: true }
-      );
-
-      if (!updatedStage) {
-        this.Stagelogger.warn(`Stage with ID ${id} not found for update`);
-        return null;
+      const updateData: Prisma.StageUpdateInput = {};
+      if (updateStageDto.stage_id !== undefined) {
+        updateData.stage_id = updateStageDto.stage_id;
+      }
+      if (updateStageDto.data !== undefined) {
+        updateData.data = this.serializeData(updateStageDto.data);
       }
 
-      return updatedStage;
+      const updatedStage = await this.prisma.stage.update({
+        where: { id },
+        data: updateData
+      });
+
+      return {
+        ...updatedStage,
+        data: this.deserializeData(updatedStage.data)
+      };
     } catch (error) {
-      this.Stagelogger.error(`Failed to update stage by ID ${id}: ${error.message}`, error.stack);
+      if (error.code === 'P2025') { // Record not found
+        this.logger.warn(`Stage with ID ${id} not found for update`);
+        return null;
+      }
+      this.logger.error(`Failed to update stage by ID ${id}: ${error.message}`, error.stack);
       return null;
     }
   }
 
-  // Update stage by custom id field
-  async updateByStageId(stageId: number, updateStageDto: UpdateStageDto): Promise<Stage> {
+  // Update stage by stage_id
+  async updateByStageId(stageId: number, updateStageDto: UpdateStageDto) {
     try {
-      // If updating the stage id, check for conflicts
-      if (updateStageDto.id !== undefined && updateStageDto.id !== stageId) {
-        const existingStage = await this.stageModel.findOne({ id: updateStageDto.id });
+      // If updating the stage_id, check for conflicts
+      if (updateStageDto.stage_id !== undefined && updateStageDto.stage_id !== stageId) {
+        const existingStage = await this.prisma.stage.findUnique({
+          where: { stage_id: updateStageDto.stage_id }
+        });
+
         if (existingStage) {
-          this.Stagelogger.warn(`Stage with id ${updateStageDto.id} already exists, skipping update`);
-          return existingStage;
+          this.logger.warn(`Stage with stage_id ${updateStageDto.stage_id} already exists, skipping update`);
+          return {
+            ...existingStage,
+            data: this.deserializeData(existingStage.data)
+          };
         }
       }
 
-      const updatedStage = await this.stageModel.findOneAndUpdate(
-        { id: stageId },
-        updateStageDto,
-        { new: true, runValidators: true }
-      );
-
-      if (!updatedStage) {
-        this.Stagelogger.warn(`Stage with stage ID ${stageId} not found for update`);
-        return null;
+      const updateData: Prisma.StageUpdateInput = {};
+      if (updateStageDto.stage_id !== undefined) {
+        updateData.stage_id = updateStageDto.stage_id;
+      }
+      if (updateStageDto.data !== undefined) {
+        updateData.data = this.serializeData(updateStageDto.data);
       }
 
-      return updatedStage;
+      const updatedStage = await this.prisma.stage.update({
+        where: { stage_id: stageId },
+        data: updateData
+      });
+
+      return {
+        ...updatedStage,
+        data: this.deserializeData(updatedStage.data)
+      };
     } catch (error) {
-      this.Stagelogger.error(`Failed to update stage by stage ID ${stageId}: ${error.message}`, error.stack);
+      if (error.code === 'P2025') { // Record not found
+        this.logger.warn(`Stage with stage_id ${stageId} not found for update`);
+        return null;
+      }
+      this.logger.error(`Failed to update stage by stage_id ${stageId}: ${error.message}`, error.stack);
       return null;
     }
   }
 
-  // Delete stage by MongoDB ObjectId
-  async deleteById(id: string): Promise<Stage> {
+  // Delete stage by Prisma ID
+  async deleteById(id: string) {
     try {
-      const deletedStage = await this.stageModel.findByIdAndDelete(id);
-      if (!deletedStage) {
-        this.Stagelogger.warn(`Stage with ID ${id} not found for deletion`);
+      const deletedStage = await this.prisma.stage.delete({
+        where: { id }
+      });
+
+      return {
+        ...deletedStage,
+        data: this.deserializeData(deletedStage.data)
+      };
+    } catch (error) {
+      if (error.code === 'P2025') { // Record not found
+        this.logger.warn(`Stage with ID ${id} not found for deletion`);
         return null;
       }
-      return deletedStage;
-    } catch (error) {
-      this.Stagelogger.error(`Failed to delete stage by ID ${id}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to delete stage by ID ${id}: ${error.message}`, error.stack);
       return null;
     }
   }
 
-  // Delete stage by custom id field
-  async deleteByStageId(stageId: number): Promise<Stage> {
+  // Delete stage by stage_id
+  async deleteByStageId(stageId: number) {
     try {
-      const deletedStage = await this.stageModel.findOneAndDelete({ id: stageId });
-      if (!deletedStage) {
-        this.Stagelogger.warn(`Stage with stage ID ${stageId} not found for deletion`);
+      const deletedStage = await this.prisma.stage.delete({
+        where: { stage_id: stageId }
+      });
+
+      return {
+        ...deletedStage,
+        data: this.deserializeData(deletedStage.data)
+      };
+    } catch (error) {
+      if (error.code === 'P2025') { // Record not found
+        this.logger.warn(`Stage with stage_id ${stageId} not found for deletion`);
         return null;
       }
-      return deletedStage;
-    } catch (error) {
-      this.Stagelogger.error(`Failed to delete stage by stage ID ${stageId}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to delete stage by stage_id ${stageId}: ${error.message}`, error.stack);
       return null;
     }
   }
@@ -194,48 +265,52 @@ export class StageService {
   // Count total stages
   async count(): Promise<number> {
     try {
-      return await this.stageModel.countDocuments();
+      return await this.prisma.stage.count();
     } catch (error) {
-      this.Stagelogger.error(`Failed to count stages: ${error.message}`, error.stack);
+      this.logger.error(`Failed to count stages: ${error.message}`, error.stack);
       return 0;
     }
   }
 
-  // Check if stage exists by custom id
+  // Check if stage exists by stage_id
   async existsByStageId(stageId: number): Promise<boolean> {
     try {
-      const stage = await this.stageModel.findOne({ id: stageId }).select('_id');
+      const stage = await this.prisma.stage.findUnique({
+        where: { stage_id: stageId },
+        select: { id: true }
+      });
       return !!stage;
     } catch (error) {
-      this.Stagelogger.error(`Failed to check stage existence for ID ${stageId}: ${error.message}`, error.stack);
+      this.logger.error(`Failed to check stage existence for stage_id ${stageId}: ${error.message}`, error.stack);
       return false;
     }
   }
 
   // Find stages with pagination
-  async findWithPagination(page: number = 1, limit: number = 10): Promise<{
-    data: Stage[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
+  async findWithPagination(page: number = 1, limit: number = 10) {
     try {
       const skip = (page - 1) * limit;
+      
       const [data, total] = await Promise.all([
-        this.stageModel.find().skip(skip).limit(limit).exec(),
-        this.stageModel.countDocuments()
+        this.prisma.stage.findMany({
+          skip,
+          take: limit
+        }),
+        this.prisma.stage.count()
       ]);
 
       return {
-        data,
+        data: data.map(stage => ({
+          ...stage,
+          data: this.deserializeData(stage.data)
+        })),
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
-      this.Stagelogger.error(`Failed to fetch paginated stages: ${error.message}`, error.stack);
+      this.logger.error(`Failed to fetch paginated stages: ${error.message}`, error.stack);
       return {
         data: [],
         total: 0,
@@ -247,59 +322,144 @@ export class StageService {
   }
 
   // Bulk operations
-  async createMany(stages: CreateStageDto[]): Promise<Stage[]> {
+  async createMany(stages: CreateStageDto[]) {
     try {
-      // Check for duplicate stage IDs
-      const stageIds = stages.map(s => s.id);
+      // Check for duplicate stage_ids
+      const stageIds = stages.map(s => s.stage_id);
       const duplicates = stageIds.filter((id, index) => stageIds.indexOf(id) !== index);
+      
       if (duplicates.length > 0) {
-        this.Stagelogger.warn(`Duplicate stage IDs found: ${duplicates.join(', ')}, skipping duplicates`);
-        // Filter out duplicates
-        const uniqueStages = stages.filter((stage, index, self) => 
-          index === self.findIndex(s => s.id === stage.id)
+        this.logger.warn(`Duplicate stage_ids found: ${duplicates.join(', ')}, skipping duplicates`);
+        stages = stages.filter((stage, index, self) => 
+          index === self.findIndex(s => s.stage_id === stage.stage_id)
         );
-        stages = uniqueStages;
       }
 
-      // Check if any stage IDs already exist in database
-      const existingStages = await this.stageModel.find({ id: { $in: stageIds } });
+      // Check if any stage_ids already exist in database
+      const existingStages = await this.prisma.stage.findMany({
+        where: { stage_id: { in: stageIds } }
+      });
+
       if (existingStages.length > 0) {
-        const existingIds = existingStages.map(s => s.id);
-        this.Stagelogger.warn(`Stages with IDs already exist: ${existingIds.join(', ')}, updating existing ones`);
+        const existingIds = existingStages.map(s => s.stage_id);
+        this.logger.warn(`Stages with stage_ids already exist: ${existingIds.join(', ')}, updating existing ones`);
         
-        // Separate new and existing stages
-        const newStages = stages.filter(stage => !existingIds.includes(stage.id));
-        const existingStageUpdates = stages.filter(stage => existingIds.includes(stage.id));
+        const newStages = stages.filter(stage => !existingIds.includes(stage.stage_id));
+        const existingStageUpdates = stages.filter(stage => existingIds.includes(stage.stage_id));
         
         // Update existing stages
         const updatePromises = existingStageUpdates.map(stage => 
-          this.updateByStageId(stage.id, stage)
+          this.updateByStageId(stage.stage_id, stage)
         );
         
         // Create new stages and update existing ones
         const [createdStages, updatedStages] = await Promise.all([
-          newStages.length > 0 ? this.stageModel.insertMany(newStages) : Promise.resolve([]),
+          newStages.length > 0 ? this.prisma.stage.createMany({
+            data: newStages.map(stage => ({
+              stage_id: stage.stage_id,
+              data: this.serializeData(stage.data)
+            }))
+          }) : Promise.resolve({ count: 0 }),
           Promise.all(updatePromises)
         ]);
         
-        return [...(createdStages as Stage[]), ...updatedStages.filter(s => s !== null)];
+        // Fetch the created stages to return them
+        const newlyCreatedStages = newStages.length > 0 ? 
+          await this.prisma.stage.findMany({
+            where: { stage_id: { in: newStages.map(s => s.stage_id) } }
+          }) : [];
+
+        const allStages = [
+          ...newlyCreatedStages.map(stage => ({
+            ...stage,
+            data: this.deserializeData(stage.data)
+          })),
+          ...updatedStages.filter(s => s !== null)
+        ];
+
+        return allStages;
       }
 
-      const createdStages = await this.stageModel.insertMany(stages);
-      return createdStages as Stage[];
+      // Create all stages
+      await this.prisma.stage.createMany({
+        data: stages.map(stage => ({
+          stage_id: stage.stage_id,
+          data: this.serializeData(stage.data)
+        }))
+      });
+
+      // Fetch and return the created stages
+      const createdStages = await this.prisma.stage.findMany({
+        where: { stage_id: { in: stageIds } }
+      });
+
+      return createdStages.map(stage => ({
+        ...stage,
+        data: this.deserializeData(stage.data)
+      }));
     } catch (error) {
-      this.Stagelogger.error(`Failed to create multiple stages: ${error.message}`, error.stack);
+      this.logger.error(`Failed to create multiple stages: ${error.message}`, error.stack);
       return [];
     }
   }
 
   async deleteMany(stageIds: number[]): Promise<{ deletedCount: number }> {
     try {
-      const result = await this.stageModel.deleteMany({ id: { $in: stageIds } });
-      return { deletedCount: result.deletedCount };
+      const result = await this.prisma.stage.deleteMany({
+        where: { stage_id: { in: stageIds } }
+      });
+      return { deletedCount: result.count };
     } catch (error) {
-      this.Stagelogger.error(`Failed to delete multiple stages: ${error.message}`, error.stack);
+      this.logger.error(`Failed to delete multiple stages: ${error.message}`, error.stack);
       return { deletedCount: 0 };
     }
+  }
+
+  // Helper methods for data serialization/deserialization
+  private serializeData(data: any): any {
+    if (data === null || data === undefined) return null;
+    
+    // For MongoDB, Prisma handles JSON natively
+    // For SQLite, we need to stringify JSON data
+    if (process.env.DATABASE_PROVIDER.toString() === 'sqlite') {
+      return JSON.stringify(data);
+    }
+    
+    return data; // MongoDB case
+  }
+
+  private deserializeData(data: any): any {
+    if (data === null || data === undefined) return null;
+    
+    // For SQLite, parse the JSON string
+    if (process.env.DATABASE_PROVIDER.toString() === 'sqlite' && typeof data === 'string') {
+      try {
+        return JSON.parse(data);
+      } catch (error) {
+        this.logger.warn(`Failed to parse JSON data: ${error.message}`);
+        return data; // Return as-is if parsing fails
+      }
+    }
+    
+    return data; // MongoDB case or already parsed
+  }
+
+  // Helper to convert Mongoose sort to Prisma orderBy
+  private convertSortToPrisma(sort: any): Prisma.StageOrderByWithRelationInput {
+    if (typeof sort === 'string') {
+      const field = sort.startsWith('-') ? sort.substring(1) : sort;
+      const direction = sort.startsWith('-') ? 'desc' : 'asc';
+      return { [field]: direction };
+    }
+    
+    if (typeof sort === 'object') {
+      const orderBy: Prisma.StageOrderByWithRelationInput = {};
+      for (const [field, direction] of Object.entries(sort)) {
+        orderBy[field] = direction === -1 || direction === 'desc' ? 'desc' : 'asc';
+      }
+      return orderBy;
+    }
+    
+    return { stage_id: 'asc' }; // Default sort
   }
 }

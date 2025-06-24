@@ -1,0 +1,25 @@
+model Diagnosis {
+  {{#if_mongodb}}
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  concept_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id         String @id @default(cuid())
+  concept_id Int    @unique
+  {{/if_sqlite}}
+
+  concept_name_id   Int?
+  concept_name_type String?
+  creator           Int?
+  date_created      DateTime?
+  date_voided       DateTime?
+  locale            String?
+  locale_preferred  Boolean?
+  name              String?
+  uuid              String?
+  void_reason       String?
+  voided            Boolean  @default(false)
+  voided_by         Int?
+
+  @@map("diagnoses")
+}

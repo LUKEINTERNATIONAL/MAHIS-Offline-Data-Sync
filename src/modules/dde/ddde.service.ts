@@ -1,23 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { DDE, DDEDocument, DDEStatus } from './schema/dde.shema';
+import { PrismaService } from '../prisma/prisma.service';
+import { DDE, DDEStatus } from '@prisma/client';
 
 @Injectable()
 export class DDEService {
     private readonly logger = new Logger(DDEService.name);
     
     constructor(
-        @InjectModel(DDE.name) 
-        private readonly DDEModel: Model<DDEDocument>
+        private readonly prisma: PrismaService
     ) {}
 
     async create(data: Partial<DDE>): Promise<DDE> {
-        return this.DDEModel.create(data);
+        return this.prisma.dDE.create({
+            data: data as any
+        });
     }
 
     async findAll(): Promise<DDE[]> {
-        return this.DDEModel.find().exec();
+        return this.prisma.dDE.findMany();
     }
 
     /**
@@ -26,22 +26,24 @@ export class DDEService {
      */
     async findRandomWithNullStatus(): Promise<DDE | null> {
         try {
-            // Use findOneAndUpdate with atomic operation to avoid race conditions
-            const updatedDoc = await this.DDEModel.findOneAndUpdate(
-                { status: null },
-                { $set: { status: DDEStatus.PENDING } },
-                { 
-                    new: true, // Return the updated document
-                    runValidators: true
-                }
-            ).exec();
+            // Find a random document with null status
+            const documents = await this.prisma.dDE.findMany({
+                where: { status: null },
+                take: 1
+            });
 
-            if (updatedDoc) {
-                this.logger.log(`Found and marked document as pending for NPID: ${updatedDoc.npid}`);
-            } else {
+            if (documents.length === 0) {
                 this.logger.log('No documents with null status found');
+                return null;
             }
 
+            // Update the found document to pending status
+            const updatedDoc = await this.prisma.dDE.update({
+                where: { id: documents[0].id },
+                data: { status: DDEStatus.pending }
+            });
+
+            this.logger.log(`Found and marked document as pending for NPID: ${updatedDoc.npid}`);
             return updatedDoc;
         } catch (error) {
             this.logger.error(`Error finding random document with null status: ${error.message}`, error.stack);
@@ -62,30 +64,25 @@ export class DDEService {
 
         try {
             // Find existing document
-            const existingDoc = await this.DDEModel.findOne({ npid }).exec();
+            const existingDoc = await this.prisma.dDE.findUnique({
+                where: { npid }
+            });
 
             if (existingDoc) {
                 // Update only missing fields
                 const updateData: any = {};
                 
                 // Only update data if it doesn't exist or is empty
-                if (!existingDoc.data || Object.keys(existingDoc.data).length === 0) {
+                if (!existingDoc.data || Object.keys(existingDoc.data as any).length === 0) {
                     updateData.data = npidData;
-                }
-
-                // Only update status if it's null/undefined
-                if (existingDoc.status === null || existingDoc.status === undefined) {
-                    // Keep status as null initially, don't set to PENDING
-                    // updateData.status = DDEStatus.PENDING;
                 }
 
                 // If there are fields to update
                 if (Object.keys(updateData).length > 0) {
-                    const updatedDoc = await this.DDEModel.findOneAndUpdate(
-                        { npid },
-                        { $set: updateData },
-                        { new: true, runValidators: true }
-                    ).exec();
+                    const updatedDoc = await this.prisma.dDE.update({
+                        where: { npid },
+                        data: updateData
+                    });
                     
                     this.logger.log(`Updated DDE document for NPID: ${npid}`);
                     return updatedDoc;
@@ -95,10 +92,12 @@ export class DDEService {
                 }
             } else {
                 // Create new document
-                const newDoc = await this.DDEModel.create({
-                    npid,
-                    data: npidData,
-                    status: null // Initially null as requested
+                const newDoc = await this.prisma.dDE.create({
+                    data: {
+                        npid,
+                        data: npidData,
+                        status: null // Initially null as requested
+                    }
                 });
                 
                 this.logger.log(`Created new DDE document for NPID: ${npid}`);
@@ -118,30 +117,33 @@ export class DDEService {
 
         for (const npidObj of npidObjects) {
             try {
-                const existingDoc = await this.DDEModel.findOne({ npid: npidObj.npid }).exec();
+                const existingDoc = await this.prisma.dDE.findUnique({
+                    where: { npid: npidObj.npid }
+                });
                 
                 if (existingDoc) {
                     // Update logic for existing document
                     const updateData: any = {};
                     
-                    if (!existingDoc.data || Object.keys(existingDoc.data).length === 0) {
+                    if (!existingDoc.data || Object.keys(existingDoc.data as any).length === 0) {
                         updateData.data = npidObj;
                     }
 
                     if (Object.keys(updateData).length > 0) {
-                        await this.DDEModel.findOneAndUpdate(
-                            { npid: npidObj.npid },
-                            { $set: updateData },
-                            { new: true, runValidators: true }
-                        ).exec();
+                        await this.prisma.dDE.update({
+                            where: { npid: npidObj.npid },
+                            data: updateData
+                        });
                         results.updated++;
                     }
                 } else {
                     // Create new document
-                    await this.DDEModel.create({
-                        npid: npidObj.npid,
-                        data: npidObj,
-                        status: null
+                    await this.prisma.dDE.create({
+                        data: {
+                            npid: npidObj.npid,
+                            data: npidObj,
+                            status: null
+                        }
                     });
                     results.created++;
                 }
@@ -162,18 +164,27 @@ export class DDEService {
      * Find DDE document by NPID
      */
     async findByNpid(npid: string): Promise<DDE | null> {
-        return this.DDEModel.findOne({ npid }).exec();
+        return this.prisma.dDE.findUnique({
+            where: { npid }
+        });
     }
 
     /**
      * Update status of DDE document
      */
     async updateStatus(npid: string, status: DDEStatus): Promise<DDE | null> {
-        return this.DDEModel.findOneAndUpdate(
-            { npid },
-            { $set: { status } },
-            { new: true, runValidators: true }
-        ).exec();
+        try {
+            return await this.prisma.dDE.update({
+                where: { npid },
+                data: { status }
+            });
+        } catch (error) {
+            // If record not found, return null
+            if (error.code === 'P2025') {
+                return null;
+            }
+            throw error;
+        }
     }
 
     /**
@@ -186,20 +197,20 @@ export class DDEService {
                 throw new Error('NPID is required');
             }
 
-            const updatedDoc = await this.DDEModel.findOneAndUpdate(
-                { npid },
-                { $set: { status: DDEStatus.COMPLETED } },
-                { new: true, runValidators: true }
-            ).exec();
+            const updatedDoc = await this.prisma.dDE.update({
+                where: { npid },
+                data: { status: DDEStatus.completed }
+            });
 
-            if (updatedDoc) {
-                this.logger.log(`Successfully marked DDE document as completed for NPID: ${npid}`);
-            } else {
-                this.logger.warn(`No DDE document found for NPID: ${npid}`);
-            }
-
+            this.logger.log(`Successfully marked DDE document as completed for NPID: ${npid}`);
             return updatedDoc;
         } catch (error) {
+            // If record not found, return null
+            if (error.code === 'P2025') {
+                this.logger.warn(`No DDE document found for NPID: ${npid}`);
+                return null;
+            }
+            
             this.logger.error(`Error marking DDE document as completed for NPID ${npid}: ${error.message}`, error.stack);
             throw error;
         }
@@ -241,7 +252,11 @@ export class DDEService {
             }
         } catch (error) {
             this.logger.error(`Error marking NPID as completed ${npid}: ${error.message}`, error.stack);
-            //throw error;
+            return {
+                found: false,
+                updated: false,
+                message: `Error: ${error.message}`
+            };
         }
     }
 }

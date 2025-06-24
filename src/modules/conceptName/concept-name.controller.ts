@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Post, Body } from '@nestjs/common';
 import { ConceptNameService } from './concept-name.service';
-import { ConceptName } from './schemas/concept-name.schema';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ConceptName } from '@prisma/client'; // <-- Use this if you have Prisma
 
 @ApiTags('Concept Names')
 @Controller('concept-names')

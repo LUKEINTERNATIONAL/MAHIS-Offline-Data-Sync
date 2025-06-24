@@ -1,0 +1,24 @@
+model DDE {
+  {{#if_mongodb}}
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  npid      String      @unique
+  data      Json        // MongoDB: native JSON
+  status    DDEStatus?
+  createdAt DateTime    @default(now())
+  {{/if_mongodb}}
+
+  {{#if_sqlite}}
+  id        String      @id @default(cuid())
+  npid      String      @unique
+  data      String      // SQLite: JSON stored as TEXT
+  status    DDEStatus?
+  createdAt DateTime    @default(now())
+  {{/if_sqlite}}
+
+  @@map("dde")
+}
+
+enum DDEStatus {
+  pending
+  completed
+}

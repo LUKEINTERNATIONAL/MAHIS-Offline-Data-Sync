@@ -1,55 +1,54 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
 import { lastValueFrom } from 'rxjs';
-import { Ward, WardDocument } from './schema/ward.schema';
-import { Model } from 'mongoose';
-import { clear } from 'console';
+import { Ward, Prisma } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
-
+import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class WardService {
   constructor(
-    @InjectModel(Ward.name)
-    private wardModel: Model<WardDocument>,
+    private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-    private authService: AuthService
+    private readonly authService: AuthService
   ) {}
 
-  async create(data: Partial<Ward>): Promise<Ward> {
-    return this.wardModel.create(data);
+  async create(data: Prisma.WardCreateInput): Promise<Ward> {
+    return this.prisma.ward.create({ data });
   }
 
   async findAll(): Promise<Ward[]> {
-    return this.wardModel.find().exec();
+    return this.prisma.ward.findMany();
   }
 
   async findById(location_id: number): Promise<Ward | null> {
-    return this.wardModel.findOne({ location_id }).exec();
+    return this.prisma.ward.findUnique({ where: { location_id } });
   }
 
   async update(location_id: number, data: Partial<Ward>): Promise<Ward | null> {
-    return this.wardModel.findOneAndUpdate({ location_id }, data, { new: true }).exec();
+    return this.prisma.ward.update({
+      where: { location_id },
+      data,
+    });
   }
 
   async delete(location_id: number): Promise<Ward | null> {
-    return this.wardModel.findOneAndDelete({ location_id }).exec();
+    return this.prisma.ward.delete({ where: { location_id } });
   }
 
   async count(): Promise<number> {
-    return this.wardModel.countDocuments().exec();
+    return this.prisma.ward.count();
   }
 
   async loadWards(count?: number): Promise<void> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        // this.logger.error("Failed to authenticate")
       }
-      const apiUrl = this.authService.getBaseUrl()
-      const token = this.authService.getAuthToken()
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken();
 
       // Fetch wards with filter tag "Facility adult sections"
       const wardsResponse$ = this.httpService.get(
@@ -71,10 +70,10 @@ export class WardService {
       }
 
       // Clear existing wards
-      await this.wardModel.deleteMany({});
+      await this.prisma.ward.deleteMany({});
 
       if (wards.length > 0) {
-        await this.wardModel.insertMany(wards);
+        await this.prisma.ward.createMany({ data: wards });
         console.log(`${wards.length} wards loaded.`);
       } else {
         console.log('No wards found.');

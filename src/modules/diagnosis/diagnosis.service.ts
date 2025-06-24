@@ -1,56 +1,49 @@
 import { Injectable } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
-import { Diagnosis, DiagnosisDocument } from "./schema/diagnosis.schema";
-import { ConfigService } from "@nestjs/config";
+import { Diagnosis, Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 import { HttpService } from "@nestjs/axios";
-import { lastValueFrom } from "rxjs";
 import { AuthService } from "../auth/auth.service";
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class DiagnosisService {
   constructor(
-    @InjectModel(Diagnosis.name)
-    private diagnosisModel: Model<DiagnosisDocument>,
-    private configService: ConfigService,
-    private httpService: HttpService,
-    private authService: AuthService
+    private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+    private readonly authService: AuthService
   ) {}
 
-  async create(data: Partial<Diagnosis>): Promise<Diagnosis> {
-    return this.diagnosisModel.create(data);
+  async create(data: Prisma.DiagnosisCreateInput): Promise<Diagnosis> {
+    return this.prisma.diagnosis.create({ data });
   }
 
   async findAll(): Promise<Diagnosis[]> {
-    return this.diagnosisModel.find().exec();
+    return this.prisma.diagnosis.findMany();
   }
 
   async findById(id: number): Promise<Diagnosis | null> {
-    return this.diagnosisModel.findOne({ id }).exec();
-  }
-
-  async count(): Promise<number> {
-    return this.diagnosisModel.countDocuments().exec();
+    return this.prisma.diagnosis.findUnique({ where: { id: id.toString() } });
   }
 
   async update(
     id: number,
     data: Partial<Diagnosis>
   ): Promise<Diagnosis | null> {
-    return this.diagnosisModel
-      .findOneAndUpdate({ id }, data, { new: true })
-      .exec();
+    return this.prisma.diagnosis.update({
+      where: { id: id.toString() },
+      data,
+    });
   }
 
   async delete(id: number): Promise<Diagnosis | null> {
-    return this.diagnosisModel.findOneAndDelete({ id }).exec();
+    return this.prisma.diagnosis.delete({ where: { id: id.toString() } });
   }
 
   async loadDiagnoses(expectedCount?: number): Promise<void> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        throw new Error("Failed to authenticate");
       }
       const apiUrl = this.authService.getBaseUrl();
       const token = this.authService.getAuthToken();
@@ -67,7 +60,7 @@ export class DiagnosisService {
       const diagnosesResponse = await lastValueFrom(diagnosesResponse$);
       const diagnoses = diagnosesResponse.data;
 
-      const totalDocuments = await this.count();
+      const totalDocuments = await this.prisma.diagnosis.count();
 
       if (expectedCount && totalDocuments === expectedCount) {
         console.log("No new diagnoses to update.");
@@ -75,11 +68,11 @@ export class DiagnosisService {
       }
 
       // Clear existing
-      await this.diagnosisModel.deleteMany({});
+      await this.prisma.diagnosis.deleteMany({});
 
       // Bulk insert
       if (diagnoses.length > 0) {
-        await this.diagnosisModel.insertMany(diagnoses);
+        await this.prisma.diagnosis.createMany({ data: diagnoses });
         console.log(`${diagnoses.length} diagnoses loaded.`);
       } else {
         console.log("No diagnoses found.");

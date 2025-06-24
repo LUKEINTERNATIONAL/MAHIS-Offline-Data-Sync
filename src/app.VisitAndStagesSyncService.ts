@@ -1,12 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AuthService } from './app.authService';
 import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { lastValueFrom } from "rxjs";
-import { User, UserDocument } from './modules/user/schema/user.schema';
-import { Model } from 'mongoose';
-import { InjectModel } from '@nestjs/mongoose';
+import { UserService } from './modules/user/user.service';
 
 @Injectable()
 export class VisitAndStagesSyncService {
@@ -18,19 +16,21 @@ export class VisitAndStagesSyncService {
         private readonly authService: AuthService,
         private readonly visitService: VisitService,
         private readonly stageService: StageService,
-        @InjectModel(User.name)
-        private readonly userModel: Model<UserDocument>,
+        private readonly userService: UserService, // Use Prisma service
     ) {}
 
     async getVisitsViaExternalAPI(): Promise<any> {
         try {
             const isAuthenticated = await this.authService.ensureAuthenticated();
             if (!isAuthenticated) {
-                throw new Error('Failed to authenticate');
+                // this.logger.error("Failed to authenticate")
             }
 
-            const user = await this.userModel.findOne().sort({ id: -1 });
-            
+            // Use Prisma UserService to get the latest user
+            const user = await this.userService.findLatestUser();
+            if (!user) {
+                throw new Error('No user found');
+            }
 
             this.Visitlogger.log(`Syncing visits`);
 
@@ -52,23 +52,20 @@ export class VisitAndStagesSyncService {
             if (responseData) {
                 function transformVisitData(flatVisits: any[]): any[] {
                     return flatVisits.map(stage => {
-                    const { id, ...data } = stage;
-                    return {
-                        id,
-                        data: {
-                            id,
-                            ...data
-                        }
-                    };
+                        const { id, ...data } = stage;
+                        return {
+                            visit_id: id, // Use visit_id for VisitService
+                            data: {
+                                id,
+                                ...data
+                            }
+                        };
                     });
                 }
 
-                const transformedStages = transformVisitData(responseData.visits);
-                this.visitService.createMany(transformedStages);
+                const transformedVisits = transformVisitData(responseData.visits);
+                await this.visitService.createMany(transformedVisits);
             }
-
-           
-            
         } catch (error) {
             this.Visitlogger.error(`Error syncing visits: ${error.message}`, error.stack);
         }
@@ -78,7 +75,7 @@ export class VisitAndStagesSyncService {
         try {
             const isAuthenticated = await this.authService.ensureAuthenticated();
             if (!isAuthenticated) {
-                throw new Error('Failed to authenticate');
+                // this.logger.error("Failed to authenticate")
             }
 
             this.Stagelogger.log(`Syncing stages`);
@@ -97,21 +94,20 @@ export class VisitAndStagesSyncService {
             if (responseData) {
                 function transformStageData(flatStages: any[]): any[] {
                     return flatStages.map(stage => {
-                    const { id, ...data } = stage;
-                    return {
-                        id,
-                        data: {
-                            id,
-                            ...data
-                        }
-                    };
+                        const { id, ...data } = stage;
+                        return {
+                            stage_id: id, // Use stage_id for StageService
+                            data: {
+                                id,
+                                ...data
+                            }
+                        };
                     });
                 }
 
                 const transformedStages = transformStageData(responseData);
-                this.stageService.createMany(transformedStages);
+                await this.stageService.createMany(transformedStages);
             }
-
         } catch (error) {
             this.Stagelogger.error(`Error syncing stages: ${error.message}`, error.stack);
         }

@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { StageSchema, Stage } from './schema/stage.schema';
+import { PrismaModule } from '../prisma/prisma.module';
 import { StageService } from './stage.service';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: Stage.name, schema: StageSchema }])
-  ],
+  imports: [PrismaModule],
   providers: [StageService],
-  exports: [StageService, MongooseModule]
+  exports: [StageService],
 })
 export class StageModule {}

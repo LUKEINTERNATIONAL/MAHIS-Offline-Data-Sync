@@ -1,0 +1,21 @@
+model TraditionalAuthority {
+  {{#if_mongodb}}
+  id                        String @id @default(auto()) @map("_id") @db.ObjectId
+  traditional_authority_id  Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id                        String @id @default(cuid())
+  traditional_authority_id  Int    @unique
+  {{/if_sqlite}}
+
+  name          String
+  district_id   Int
+  creator       Int
+  date_created  DateTime
+  date_retired  DateTime?
+  retire_reason String?
+  retired       Boolean  @default(false)
+  retired_by    Int?
+
+  @@map("traditional_authorities")
+}

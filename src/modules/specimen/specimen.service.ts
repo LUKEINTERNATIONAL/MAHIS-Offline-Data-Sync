@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
-import { Specimen, SpecimenDocument } from "./schema/specimen.schema";
+import { Specimen, Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
@@ -10,37 +9,36 @@ import { AuthService } from "../auth/auth.service";
 @Injectable()
 export class SpecimenService {
   constructor(
-    @InjectModel(Specimen.name)
-    private specimenModel: Model<SpecimenDocument>,
+    private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-    private authService: AuthService
+    private readonly authService: AuthService
   ) {}
 
-  async create(data: Partial<Specimen>): Promise<Specimen> {
-    return this.specimenModel.create(data);
+  async create(data: Prisma.SpecimenCreateInput): Promise<Specimen> {
+    return this.prisma.specimen.create({ data });
   }
 
   async findAll(): Promise<Specimen[]> {
-    return this.specimenModel.find().exec();
+    return this.prisma.specimen.findMany();
   }
 
   async findById(id: number): Promise<Specimen | null> {
-    return this.specimenModel.findOne({ concept_id: id }).exec();
+    return this.prisma.specimen.findUnique({ where: { concept_id: id } });
   }
 
   async count(): Promise<number> {
-    return this.specimenModel.countDocuments().exec();
+    return this.prisma.specimen.count();
   }
 
   async loadSpecimens(count?: number): Promise<void> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
-        throw new Error('Failed to authenticate');
+        // this.logger.error("Failed to authenticate")
       }
-      const apiUrl = this.authService.getBaseUrl()
-      const token = this.authService.getAuthToken()
+      const apiUrl = this.authService.getBaseUrl();
+      const token = this.authService.getAuthToken();
 
       const specimenRes$ = this.httpService.get(`${apiUrl}/lab/specimen_types?paginate=false`, {
         headers: {
@@ -57,12 +55,12 @@ export class SpecimenService {
         return;
       }
 
-      // Step 1: Clear the collection
-      await this.specimenModel.deleteMany({});
+      // Step 1: Clear the table
+      await this.prisma.specimen.deleteMany({});
 
       // Step 2: Insert all fetched specimen records
       if (specimens.length > 0) {
-        await this.specimenModel.insertMany(specimens);
+        await this.prisma.specimen.createMany({ data: specimens });
         console.log(`${specimens.length} specimen records loaded.`);
       } else {
         console.log("No specimen records found.");

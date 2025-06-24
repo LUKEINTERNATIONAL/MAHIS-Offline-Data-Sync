@@ -38,7 +38,7 @@ export class DDE4DataSyncService {
 
             const isAuthenticated = await this.authService.ensureAuthenticated();
             if (!isAuthenticated) {
-                throw new Error('Failed to authenticate');
+               this.logger.error("Failed to authenticate")
             }
 
             const apiUrl = this.authService.getBaseUrl();
@@ -84,7 +84,7 @@ export class DDE4DataSyncService {
             this.logger.log(`NPID processing completed: ${JSON.stringify(results)}`);
         } catch (error) {
             this.logger.error(`Error processing NPID data: ${error.message}`, error.stack);
-            throw error;
+            // throw error;
         }
     }
 
@@ -98,7 +98,7 @@ export class DDE4DataSyncService {
             return result;
         } catch (error) {
             this.logger.error(`Error syncing single NPID ${npidData.npid}: ${error.message}`, error.stack);
-            throw error;
+            // throw error;
         }
     }
 
@@ -119,7 +119,7 @@ export class DDE4DataSyncService {
             return stats;
         } catch (error) {
             this.logger.error(`Error getting sync status: ${error.message}`, error.stack);
-            throw error;
+            // throw error;
         }
     }
 
@@ -181,7 +181,7 @@ export class DDE4DataSyncService {
             }
         } catch (error) {
             this.logger.error(`Error checking null status records: ${error.message}`, error.stack);
-            throw error;
+            // throw error;
         }
     }
 }

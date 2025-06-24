@@ -1,0 +1,38 @@
+model Ward {
+  {{#if_mongodb}}
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  location_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id          String @id @default(cuid())
+  location_id Int    @unique
+  {{/if_sqlite}}
+
+  uuid              String?
+  address1          String   @default("")
+  address2          String   @default("")
+  city_village      String   @default("")
+  country           String   @default("")
+  county_district   Int?
+  creator           Int
+  date_created      DateTime
+  date_retired      DateTime?
+  description       String   @default("")
+  district          String   @default("")
+  latitude          String   @default("")
+  location_type_id  Int?
+  longitude         String   @default("")
+  name              String
+  neighborhood_cell Int?
+  parent_location   Int?
+  postal_code       String   @default("")
+  region            Int?
+  retire_reason     String?
+  retired           Boolean  @default(false)
+  retired_by        Int?
+  state_province    String   @default("")
+  subregion         Int?
+  township_division Int?
+
+  @@map("wards")
+}

@@ -3,17 +3,19 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, UserDocument } from './modules/user/schema/user.schema';
 import { PatientService } from './modules/patient/patient.service';
+import { UserService } from './modules/user/user.service';
 import { DDEService } from './modules/dde/ddde.service';
-import { ServerPatientCount, ServerPatientCountDocument } from './modules/serverPatientCount/schema/server-patient-count.schema';
+import { ServerPatientCountService } from './modules/serverPatientCount/server-patient-count.service';
 
 interface AuthResponse {
   authorization: {
     token: string;
     expiry_time: string;
+    user: {
+      user_id: number;
+      location_id: number;
+    };
   };
 }
 
@@ -45,10 +47,11 @@ export class AuthService {
 
   constructor(
     private readonly httpService: HttpService,
-    private configService: ConfigService,
+    private readonly configService: ConfigService,
     private readonly patientService: PatientService,
-    @InjectModel(User.name)
-    private readonly userModel: Model<UserDocument>,
+    private readonly userService: UserService,
+    private readonly serverPatientCountService: ServerPatientCountService,
+    private readonly ddeService: DDEService,
   ) {
     this.baseUrl = this.configService.get<string>('API_BASE_URL');
   }
@@ -67,19 +70,17 @@ export class AuthService {
       this.logger.log(`Attempting to login to ${loginUrl}`);
 
       const { data } = await firstValueFrom(
-        this.httpService.post<AuthResponse>(loginUrl, loginData)
-        
-        // .pipe(
-        //   catchError((error: AxiosError) => {
-        //     this.logger.error(`Login failed: ${error.message}`);
-        //     if (error.response) {
-        //       this.logger.error(`Response status: ${error.response.status}`);
-        //       this.logger.error(`Response data: ${JSON.stringify(error.response.data)}`);
-        //     }
-        //     throw new Error(`Authentication failed: ${error.message}`);
-        //   }),
-        // ),
-      ) as any;
+        this.httpService.post<AuthResponse>(loginUrl, loginData).pipe(
+          catchError((error: AxiosError) => {
+            this.logger.error(`Login failed: ${error.message}`);
+            if (error.response) {
+              this.logger.error(`Response status: ${error.response.status}`);
+              this.logger.error(`Response data: ${JSON.stringify(error.response.data)}`);
+            }
+            throw new Error(`Authentication failed: ${error.message}`);
+          }),
+        ),
+      );
 
       if (data && data.authorization && data.authorization.token) {
         this.authToken = data.authorization.token;
@@ -87,17 +88,15 @@ export class AuthService {
 
         // Create or update user 
         const userData = {
-          id: data.authorization.user.user_id,
+          user_id: data.authorization.user.user_id,
           locationId: data.authorization.user.location_id.toString()
         };
 
-        // Remove existing users
-        await this.userModel.deleteMany({});
-
-        // Save new user
-        await this.userModel.create(userData);
+        // Remove existing users and save new user
+        await this.userService.deleteAll();
+        await this.userService.create(userData);
         
-        this.logger.log(`User data saved successfully for ID: ${userData.id}`);
+        this.logger.log(`User data saved successfully for user_id: ${userData.user_id}`);
         this.logger.log(`Login successful. Token valid until: ${this.tokenExpiry}`);
         return true;
       } else {
@@ -172,23 +171,28 @@ export class AuthService {
 /**
  * Fetch user data and save to database
  */
-async function fetchAndSaveUserData(authService: AuthService, userModel: Model<UserDocument>, httpService: HttpService, logger: Logger): Promise<User | null> {
+async function fetchAndSaveUserData(
+  authService: AuthService, 
+  userService: UserService, 
+  httpService: HttpService, 
+  logger: Logger
+): Promise<any | null> {
   try {
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
-      this.logger.error('Failed to authenticate');
-      throw new Error('Failed to authenticate');
+      logger.error('Failed to authenticate');
     }
     
     // Get the most recent user
-    const user = await userModel.findOne().sort({ id: -1 });
+    const users = await userService.findAll();
+    const user = users.length > 0 ? users[users.length - 1] : null;
 
     if (!user) {
       logger.error('No user found in the database');
       return null;
     }
 
-    const userUrl = `${authService.getBaseUrl()}/users/${user.id}`;
+    const userUrl = `${authService.getBaseUrl()}/users/${user.user_id}`;
     
     const { data } = await firstValueFrom(
       httpService.get(userUrl, {
@@ -197,11 +201,9 @@ async function fetchAndSaveUserData(authService: AuthService, userModel: Model<U
     );
 
     // Update user with new data
-    const updatedUser = await userModel.findOneAndUpdate(
-      { id: user.id },
-      { locationId: data.location_id },
-      { new: true }
-    );
+    const updatedUser = await userService.updateByUserId(user.user_id, {
+      locationId: data.location_id.toString()
+    });
 
     return updatedUser;
   } catch (error) {
@@ -214,14 +216,13 @@ async function updateIfSitePatientCountChanges(
   authService: AuthService, 
   httpService: HttpService, 
   logger: Logger,
-  serverPatientCountModel: Model<ServerPatientCountDocument>,
+  serverPatientCountService: ServerPatientCountService,
   fnToCall: Function
-) {
+): Promise<boolean> {
   try {
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
       logger.error('Failed to authenticate');
-      throw new Error('Failed to authenticate');
     }
 
     const initialRequest: SyncRequest = {
@@ -237,17 +238,15 @@ async function updateIfSitePatientCountChanges(
     const serverPatientCount = response.server_patient_count;
 
     // Get all records and ensure only one exists
-    const allRecords = await serverPatientCountModel.find({}).sort({ _id: -1 }); // Sort by newest first
+    const allRecords = await serverPatientCountService.findAll();
     
     let storedPatientCount;
     
     if (allRecords.length === 0) {
       // No records exist, create one
-      storedPatientCount = new serverPatientCountModel({ 
-        id: 1, 
+      storedPatientCount = await serverPatientCountService.create({ 
         server_patient_count: 0 
       });
-      await storedPatientCount.save();
     } else if (allRecords.length === 1) {
       // Only one record exists, use it
       storedPatientCount = allRecords[0];
@@ -255,17 +254,18 @@ async function updateIfSitePatientCountChanges(
       // Multiple records exist, keep the latest and delete the rest
       logger.warn(`Found ${allRecords.length} patient count records, cleaning up to keep only the latest`);
       
-      storedPatientCount = allRecords[0]; // Latest record (newest first due to sort)
-      const recordsToDelete = allRecords.slice(1); // All except the first (latest)
+      // Sort by createdAt to get the latest (assuming createdAt exists)
+      const sortedRecords = allRecords.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      storedPatientCount = sortedRecords[0]; // Latest record
+      const recordsToDelete = sortedRecords.slice(1); // All except the first (latest)
       
       // Delete all old records
       for (const record of recordsToDelete) {
-        await serverPatientCountModel.deleteOne({ _id: record._id });
+        await serverPatientCountService.remove(record.id as any);
       }
-      
-      // Update the kept record to have id: 1 for consistency
-      storedPatientCount.id = 1;
-      await storedPatientCount.save();
       
       logger.log(`Cleaned up ${recordsToDelete.length} duplicate patient count records`);
     }
@@ -275,12 +275,12 @@ async function updateIfSitePatientCountChanges(
       logger.log(`Patient count changed: ${storedPatientCount.server_patient_count} -> ${serverPatientCount}`);
       
       // Call the passed function
-      // await fnToCall();
       fnToCall();
       
-      // Update the local value in MongoDB
-      storedPatientCount.server_patient_count = serverPatientCount;
-      await storedPatientCount.save();
+      // Update the local value
+      await serverPatientCountService.update(storedPatientCount.id, {
+        server_patient_count: serverPatientCount
+      });
       
       logger.log('Local patient count updated successfully');
       return true;
@@ -291,19 +291,24 @@ async function updateIfSitePatientCountChanges(
 
   } catch (error) {
     logger.error('Error in updateIfSitePatientCountChanges:', error);
-    // throw error;
+    return false;
   }
 }
 
 /**
  * Synchronize patient IDs from the server
  */
-async function syncPatientIds(authService: AuthService, httpService: HttpService, logger: Logger, patientService: PatientService, ddeService: DDEService): Promise<boolean> {
+async function syncPatientIds(
+  authService: AuthService, 
+  httpService: HttpService, 
+  logger: Logger, 
+  patientService: PatientService, 
+  ddeService: DDEService
+): Promise<boolean> {
   try {
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
-      this.logger.error('Failed to authenticate');
-      throw new Error('Failed to authenticate');
+      logger.error('Failed to authenticate');
     }
 
     const PAGE_SIZE = 50;
@@ -323,10 +328,10 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
 
     if (!firstResponse) return false;
 
-    // console.log('First response:', firstResponse.sync_patients);
-    firstResponse.sync_patients.forEach((patient) => {
-        updatePayload(patient, patientService, logger, ddeService);
-    })
+    // Process first batch of patients
+    for (const patient of firstResponse.sync_patients) {
+      await updatePayload(patient, patientService, logger, ddeService);
+    }
 
     totalPatients = firstResponse.server_patient_count;
     processedPatients += firstResponse.sync_patients.length;
@@ -347,10 +352,10 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
       const response = await makePatientSyncRequest(request, authService, httpService, logger);
       if (!response) return false;
 
-      // console.log('First response:', firstResponse.sync_patients);
-      response.sync_patients.forEach((patient) => {
-          updatePayload(patient, patientService, logger, ddeService);
-      })
+      // Process batch of patients
+      for (const patient of response.sync_patients) {
+        await updatePayload(patient, patientService, logger, ddeService);
+      }
 
       processedPatients += response.sync_patients.length;
       logger.log(`Processed ${processedPatients}/${totalPatients} patients`);
@@ -360,7 +365,7 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
     return true;
 
   } catch (error) {
-    // logger.error(`Error syncing patient IDs: ${error.message}`);
+    logger.error(`Error syncing patient IDs: ${error.message}`);
     return false;
   }
 }
@@ -368,12 +373,18 @@ async function syncPatientIds(authService: AuthService, httpService: HttpService
 /**
  * Make a single patient sync request
  */
-async function makePatientSyncRequest(request: SyncRequest, authService: AuthService, httpService: HttpService, logger: Logger): Promise<SyncPatientsResponse | null> {
+async function makePatientSyncRequest(
+  request: SyncRequest, 
+  authService: AuthService, 
+  httpService: HttpService, 
+  logger: Logger
+): Promise<SyncPatientsResponse | null> {
   try {
     const isAuthenticated = await authService.ensureAuthenticated();
     if (!isAuthenticated) {
-      throw new Error('Failed to authenticate');
+      logger.error("Failed to authenticate")
     }
+    
     const syncUrl = `${authService.getBaseUrl()}/sync/patients_ids`;
     
     const { data } = await firstValueFrom(
@@ -385,7 +396,7 @@ async function makePatientSyncRequest(request: SyncRequest, authService: AuthSer
         }
       ).pipe(
         catchError((error: AxiosError) => {
-          logger.error(`Sync request failed: ${error}`);
+          logger.error(`Sync request failed: ${error.message}`);
           throw error;
         }),
       ),
@@ -398,41 +409,49 @@ async function makePatientSyncRequest(request: SyncRequest, authService: AuthSer
   }
 }
 
-async function updatePayload(patient: any, patientService: PatientService, logger: Logger, ddeService: DDEService): Promise<void> {
-    try {
-      if (!patient.ID) {
-        throw new Error('Patient ID is required');
-      }
-
-      patientService.findAndDeduplicateByDataId(patient.ID.toString());
-
-      // Use upsert to update if exists, create if doesn't exist
-      const result = await patientService.upsert(
-        { patientID: patient.ID.toString() }, // Find by patientID
-        {
-          $set: {
-            timestamp: Date.now(),
-            message: 'Updated/Created payload from API VIA ALL',
-            data: patient
-          },
-          $setOnInsert: {
-            patientID: patient.ID.toString() // Only set on insert
-          }
-        }
-      );
-
-      ddeService.markAsCompleted(patient.ID.toString());
-      
-      if (result.upsertedCount > 0) {
-        logger.log(`Created new patient record for patientID: ${patient.ID}`);
-      } else {
-        logger.log(`Updated existing patient record with patientID: ${patient.ID}`);
-      }
-    } catch (error) {
-      logger.error(`Error updating patient record: ${error.message}`);
-      throw error;
+async function updatePayload(
+  patient: any, 
+  patientService: PatientService, 
+  logger: Logger, 
+  ddeService: DDEService
+): Promise<void> {
+  try {
+    if (!patient.ID) {
+      throw new Error('Patient ID is required');
     }
+
+    // Remove duplicates first
+    await patientService.findAndDeduplicateByDataId(patient.ID.toString());
+
+    // Use updateByPatientId which handles upsert logic
+    const result = await patientService.updateByPatientId(
+      patient.ID.toString(),
+      {
+        timestamp: new Date().toISOString(),
+        message: 'Updated/Created payload from API VIA ALL',
+        data: patient
+      }
+    );
+
+    // Mark as completed in DDE
+    await ddeService.markAsCompleted(patient.ID.toString());
+    
+    if (result) {
+      logger.log(`Updated/Created patient record for patientID: ${patient.ID}`);
+    } else {
+      logger.warn(`Failed to update/create patient record for patientID: ${patient.ID}`);
+    }
+  } catch (error) {
+    logger.error(`Error updating patient record: ${error.message}`);
+    // throw error;
   }
+}
 
 // Export the standalone functions for use elsewhere
-export { fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges };
+export { 
+  fetchAndSaveUserData, 
+  syncPatientIds, 
+  makePatientSyncRequest, 
+  updatePayload, 
+  updateIfSitePatientCountChanges 
+};

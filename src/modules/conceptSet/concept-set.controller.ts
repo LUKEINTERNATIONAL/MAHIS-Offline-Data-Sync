@@ -8,7 +8,7 @@ import {
   Delete,
 } from "@nestjs/common";
 import { ConceptSetService } from "./concept-set.service";
-import { ConceptSet } from "./schema/concept-set.schema";
+import { ConceptSet } from "@prisma/client";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("Concept Sets")
@@ -24,12 +24,12 @@ export class ConceptSetController {
   @Get()
   @ApiOperation({ summary: "get all concept sets" })
   @ApiResponse({ status: 200, description: 'List all concept sets' })
-  async findAll() {
+  async findAll(): Promise<ConceptSet[]> {
     return this.conceptSetService.findAll();
   }
 
   // @Get(':id')
-  // async findById(@Param('id') id: string) {
+  // async findById(@Param('id') id: string): Promise<ConceptSet | null> {
   //   return this.conceptSetService.findById(Number(id));
   // }
 

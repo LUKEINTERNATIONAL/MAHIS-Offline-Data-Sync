@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
-import { TraditionalAuthority } from './schema/traditional-authority.schema';
+import { TraditionalAuthority } from '@prisma/client'; // Use Prisma type
 
 import { TraditionalAuthorityService } from './traditional-authority.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -18,12 +18,12 @@ export class TraditionalAuthorityController {
   @Get()
     @ApiOperation({ summary: "get all traditional authority" })
     @ApiResponse({ status: 200, description: 'List all traditional authority' })
-  async findAll() {
-    return this.TraditionalAuthorityService.findAll();
-  }
+    async findAll(): Promise<TraditionalAuthority[]> {
+      return this.TraditionalAuthorityService.findAll();
+    }
 
   // @Get(':id')
-  // async findById(@Param('id') id: string) {
+  // async findById(@Param('id') id: string): Promise<TraditionalAuthority | null> {
   //   return this.TraditionalAuthorityService.findById(Number(id));
   // }
 

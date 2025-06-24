@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Body, Put, Delete } from '@nestjs/common';
 import { WardService } from './ward.service';
-import { Ward } from './schema/ward.schema';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Ward } from '@prisma/client'; // Use Prisma type
 
 
 @ApiTags("wards")

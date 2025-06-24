@@ -1,0 +1,15 @@
+model TestResultIndicator {
+  {{#if_mongodb}}
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  concept_id Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id         String @id @default(cuid())
+  concept_id Int    @unique
+  {{/if_sqlite}}
+
+  test_type_id Int
+  name         String?
+
+  @@map("test_result_indicators")
+}

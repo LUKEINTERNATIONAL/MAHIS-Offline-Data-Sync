@@ -1,0 +1,23 @@
+model Facility {
+  {{#if_mongodb}}
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  facility_id  Int    @unique
+  {{/if_mongodb}}
+  {{#if_sqlite}}
+  id           String @id @default(cuid())
+  facility_id  Int    @unique
+  {{/if_sqlite}}
+
+  code            String  @unique
+  name            String
+  display_name    String?
+  district        String
+  status          String
+  type            String
+  coordinates     Json    @default("[]")
+  has_coordinates Boolean @default(false)
+  created_at      DateTime
+  updated_at      DateTime
+
+  @@map("facilities")
+}
