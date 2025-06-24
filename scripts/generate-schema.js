@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // Read the DATABASE_PROVIDER from environment
 const databaseProvider = process.env.DATABASE_PROVIDER;
@@ -98,26 +99,39 @@ function writeSchema(schema) {
 
   // Define output paths
   const schemaPath1 = path.join(__dirname, '../src/modules/prisma/schema.prisma');
-//   const schemaPath2 = path.join(__dirname, '../src/prisma/schema.prisma');
 
   // Ensure directories exist
   const dir1 = path.dirname(schemaPath1);
-//   const dir2 = path.dirname(schemaPath2);
   
   if (!fs.existsSync(dir1)) {
     fs.mkdirSync(dir1, { recursive: true });
   }
-//   if (!fs.existsSync(dir2)) {
-//     fs.mkdirSync(dir2, { recursive: true });
-//   }
 
   // Write schema files
   fs.writeFileSync(schemaPath1, schema);
-//   fs.writeFileSync(schemaPath2, schema);
 
   console.log(`Generated schema.prisma for ${databaseProvider}`);
   console.log(`Schema written to: ${schemaPath1}`);
-//   console.log(`Schema written to: ${schemaPath2}`);
+}
+
+// Function to run SQLite migration
+function runSQLiteMigration() {
+  if (databaseProvider.toLowerCase() === 'sqlite') {
+    console.log('\nRunning SQLite migration...');
+    try {
+      // Run the migration command
+      execSync('npx prisma migrate dev --name init', { 
+        stdio: 'inherit',
+        cwd: path.join(__dirname, '..')  // Run from project root
+      });
+      console.log('SQLite migration completed successfully!');
+    } catch (error) {
+      console.error('Error running SQLite migration:', error.message);
+      console.log('You may need to run the migration manually: npx prisma migrate dev --name init');
+    }
+  } else {
+    console.log(`Skipping migration - not applicable for ${databaseProvider}`);
+  }
 }
 
 // Main execution
@@ -125,3 +139,6 @@ const finalSchema = generateSchema();
 writeSchema(finalSchema);
 
 console.log('Schema generation completed successfully!');
+
+// Run migration if SQLite
+runSQLiteMigration();

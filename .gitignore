@@ -136,4 +136,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+/src/modules/prisma/MONDS.db
+/src/modules/prisma/schema.prisma
 database.sqlite
