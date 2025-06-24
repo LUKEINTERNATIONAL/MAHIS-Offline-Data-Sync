@@ -29,6 +29,7 @@ import { SpecimenModule } from "./modules/specimen/specimen.module";
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from "./modules/auth/auth.module";
 import { DDE4DataSyncService } from "./app.dde4dataSyncService";
+import { ServerTimeService } from "./app.serverTimeService";
 import { DDEModule } from "./modules/dde/dde.module";
 import { ServerPatientCountModule } from "./modules/serverPatientCount/server-patient-count.module";
 import { VisitModule } from "./modules/visit/visit.module";
@@ -89,7 +90,8 @@ import { PrismaModule } from "./modules/prisma/prisma.module";
     VisitService,
     StageService,
     VisitAndStagesSyncService,
+    ServerTimeService,
   ],
-  exports: [AuthService, DataSyncService, DDE4DataSyncService],
+  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService],
 })
 export class AppModule {}

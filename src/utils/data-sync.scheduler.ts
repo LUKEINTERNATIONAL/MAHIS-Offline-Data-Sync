@@ -10,6 +10,7 @@ import { DDEService } from '../modules/dde/ddde.service';
 import { VisitAndStagesSyncService } from './../app.VisitAndStagesSyncService';
 import { UserService } from '../modules/user/user.service';
 import { ServerPatientCountService } from '../modules/serverPatientCount/server-patient-count.service';
+import { ServerTimeService } from './../app.serverTimeService';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -27,6 +28,7 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly visitAndStagesSyncService: VisitAndStagesSyncService,
     private readonly userService: UserService,
     private readonly serverPatientCountService: ServerPatientCountService,
+    private readonly serverTimeService: ServerTimeService,
   ) {
     // Get configuration from environment variables with defaults
     this.isEnabled = this.configService.get<string>('SYNC_SCHEDULER_ENABLED') !== 'false';
@@ -92,6 +94,7 @@ async checkPatientCountChanges() {
     );
     await this.visitAndStagesSyncService.getStagesViaExternalAPI();
     await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    await this.serverTimeService.getServerTimeAndDate();
 
   } catch (error) {
     this.logger.error(`Patient count check failed: ${error.message}`);
@@ -119,6 +122,7 @@ async checkPatientCountChanges() {
       );
     await this.visitAndStagesSyncService.getStagesViaExternalAPI();
     await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    await this.serverTimeService.getServerTimeAndDate();
   }
 
   /**

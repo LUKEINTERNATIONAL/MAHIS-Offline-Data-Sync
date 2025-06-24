@@ -5,6 +5,7 @@ import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
 import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
+import { ServerTimeService } from './app.serverTimeService';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -22,7 +23,8 @@ export class AppController {
     private readonly patientService: PatientService,
     private readonly ddeService: DDEService,
     private readonly visitService: VisitService,
-    private readonly stageService: StageService
+    private readonly stageService: StageService,
+    private readonly serverTimeService: ServerTimeService,
   ) {}
 
   @Get()
@@ -108,5 +110,28 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     };
     
     return this.patientService.searchPatientDataWithRawQuery(searchCriteria, pagination);
+  }
+
+  /**
+   * Get stored server time data without API call
+   */
+  @Get('bare-bones-session-date-time')
+  getStoredTime() {
+      return this.serverTimeService.getStoredServerTimeData();
+  }
+
+  /**
+   * Get status information
+   */
+  @Get('session-date-time')
+  getStatus() {
+      const storedData = this.serverTimeService.getStoredServerTimeData();
+      const timeSinceUpdate = this.serverTimeService.getTimeSinceLastUpdate();
+      
+      return {
+          hasStoredData: !!storedData,
+          timeSinceLastUpdateMinutes: timeSinceUpdate,
+          storedData: storedData,
+      };
   }
 }
