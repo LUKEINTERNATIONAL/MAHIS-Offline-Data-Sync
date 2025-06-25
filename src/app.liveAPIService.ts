@@ -44,7 +44,7 @@ export class LiveAPIService implements OnModuleInit {
             if (data) {
                 this.logger.log(`API Health:`);
                 console.log(data);
-                return data;
+                return {data: data};
             }
 
 
