@@ -6,6 +6,7 @@ import { DDEService } from './modules/dde/ddde.service';
 import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { ServerTimeService } from './app.serverTimeService';
+import { LiveAPIService } from './app.liveAPIService';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -25,6 +26,7 @@ export class AppController {
     private readonly visitService: VisitService,
     private readonly stageService: StageService,
     private readonly serverTimeService: ServerTimeService,
+    private readonly liveAPIService: LiveAPIService,
   ) {}
 
   @Get()
@@ -133,5 +135,10 @@ async getPatientPayload(@Param('patientId') patientId: string) {
           timeSinceLastUpdateMinutes: timeSinceUpdate,
           storedData: storedData,
       };
+  }
+
+  @Get('live-api-health')
+  async getLiveAPIHealth() {
+    return await this.liveAPIService.getAPIHealthCheck();
   }
 }

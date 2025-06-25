@@ -38,6 +38,7 @@ import { StageModule } from "./modules/stage/stage.module";
 import { StageService } from "./modules/stage/stage.service";
 import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
 import { PrismaModule } from "./modules/prisma/prisma.module";
+import { LiveAPIService } from "./app.liveAPIService";
 
 @Module({
   imports: [
@@ -91,7 +92,8 @@ import { PrismaModule } from "./modules/prisma/prisma.module";
     StageService,
     VisitAndStagesSyncService,
     ServerTimeService,
+    LiveAPIService,
   ],
-  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService],
+  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService, LiveAPIService],
 })
 export class AppModule {}
