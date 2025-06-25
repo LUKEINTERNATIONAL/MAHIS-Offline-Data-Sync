@@ -14,12 +14,10 @@ export class LiveAPIService implements OnModuleInit {
         private readonly httpService: HttpService,
     ) {
         this.baseUrl = this.configService.get<string>('API_BASE_URL');
-    
     }
 
     async onModuleInit() {
         //  module initializes
-        
     }
 
     async getAPIHealthCheck(): Promise<any> {
@@ -46,8 +44,6 @@ export class LiveAPIService implements OnModuleInit {
                 console.log(data);
                 return {data: data};
             }
-
-
         } catch (error) {
             this.logger.error('Error getting API health:', error);
             throw error;
