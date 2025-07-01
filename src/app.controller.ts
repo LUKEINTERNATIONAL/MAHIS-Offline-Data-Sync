@@ -127,8 +127,8 @@ async getPatientPayload(@Param('patientId') patientId: string) {
    */
   @Get('session-date-time')
   getStatus() {
-      const storedData = this.serverTimeService.getStoredServerTimeData();
       const timeSinceUpdate = this.serverTimeService.getTimeSinceLastUpdate();
+      const storedData = this.serverTimeService.getStoredServerTimeData();
       
       return {
         data: {

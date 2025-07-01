@@ -100,6 +100,7 @@ export class ServerTimeService implements OnModuleInit {
      */
     getStoredServerTimeData(): ServerTimeData | null {
         try {
+            // this.updateStoredDateIfDayPassed();
             const storedData = this.localStorage.getItem(this.STORAGE_KEY);
             if (storedData) {
                 const parsedData: ServerTimeData = JSON.parse(storedData);
@@ -122,11 +123,30 @@ export class ServerTimeService implements OnModuleInit {
             return true; // No stored data, so update needed
         }
 
-        const lastUpdateTime = new Date(storedData.lastUpdated).getTime();
-        const currentTime = Date.now();
-        const dayInMs = 24 * 60 * 60 * 1000; // 86,400,000 milliseconds
+        // Get current machine date (year, month, day only)
+        const currentDate = new Date();
+        const currentDateOnly = new Date(
+            currentDate.getFullYear(), 
+            currentDate.getMonth(), 
+            currentDate.getDate()
+        );
 
-        return (currentTime - lastUpdateTime) >= dayInMs;
+        // Get stored date (year, month, day only)
+        const storedDate = new Date(storedData.lastUpdated);
+        
+        // Check if stored date is valid
+        if (isNaN(storedDate.getTime())) {
+            return true; // Invalid stored date, trigger update
+        }
+        
+        const storedDateOnly = new Date(
+            storedDate.getFullYear(), 
+            storedDate.getMonth(), 
+            storedDate.getDate()
+        );
+
+        // Compare dates: if current date > stored date, return true for update
+        return currentDateOnly.getTime() > storedDateOnly.getTime();
     }
 
     /**
@@ -153,25 +173,50 @@ export class ServerTimeService implements OnModuleInit {
         const storedData = this.getStoredServerTimeData();
         if (!storedData) return;
 
-        if (this.hasDayPassedSinceLastUpdate()) {
+        if (true) {
             try {
                 const lastUpdateTime = new Date(storedData.lastUpdated).getTime();
                 const currentTime = Date.now();
                 const daysPassed = Math.floor((currentTime - lastUpdateTime) / (24 * 60 * 60 * 1000));
+
+                console.log(`Days passed since last update: ${daysPassed}`);
+
+                // Get current machine date (year, month, day only)
+                const currentDate = new Date();
+                const currentDateOnly = new Date(
+                    currentDate.getFullYear(), 
+                    currentDate.getMonth(), 
+                    currentDate.getDate()
+                );
+
+                const storedDateForComparison = new Date(storedData.date);
                 
-                // Calculate new date by adding days passed
-                const storedDate = new Date(storedData.date);
-                storedDate.setDate(storedDate.getDate() + daysPassed);
-                const newDate = storedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+                // Check if stored date is valid
+                if (isNaN(storedDateForComparison.getTime())) {
+                    // return true; // Invalid stored date, trigger update
+                }
+                
+                const storedDateOnly = new Date(
+                    storedDateForComparison.getFullYear(), 
+                    storedDateForComparison.getMonth(), 
+                    storedDateForComparison.getDate()
+                );
 
-                const updatedData: ServerTimeData = {
-                    ...storedData,
-                    date: newDate,
-                    lastUpdated: new Date().toISOString()
-                };
+                if (currentDateOnly.getTime() > storedDateOnly.getTime()) {
+                    // Calculate new date by adding days passed
+                    const storedDate = new Date(storedData.date);
+                    storedDate.setDate(storedDate.getDate() + daysPassed);
+                    const newDate = currentDateOnly.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-                this.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedData));
-                this.logger.log(`Updated stored date from ${storedData.date} to ${newDate} (${daysPassed} days passed)`);
+                    const updatedData: ServerTimeData = {
+                        ...currentDateOnly,
+                        date: newDate,
+                        lastUpdated: new Date().toISOString()
+                    } as any;
+
+                    this.localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedData));
+                    this.logger.log(`Updated stored date from ${storedData.date} to ${newDate} (${daysPassed} days passed)`);
+                }
             } catch (error) {
                 this.logger.error(`Failed to update stored date: ${error.message}`);
             }
