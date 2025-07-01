@@ -131,9 +131,11 @@ async getPatientPayload(@Param('patientId') patientId: string) {
       const timeSinceUpdate = this.serverTimeService.getTimeSinceLastUpdate();
       
       return {
+        data: {
           hasStoredData: !!storedData,
           timeSinceLastUpdateMinutes: timeSinceUpdate,
           storedData: storedData,
+        }
       };
   }
 
