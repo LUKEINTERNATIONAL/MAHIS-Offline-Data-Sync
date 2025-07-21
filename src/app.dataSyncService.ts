@@ -172,14 +172,13 @@ export class DataSyncService {
       }
 
       const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
-
-      if (isNew == false) {
-        syncPayload = {
-          record: {
-            ...syncPayload
-          }
-        };
+      
+      syncPayload = {
+        record: {
+          ...syncPayload
+        }
       }
+ 
       const { data: responseData } = await lastValueFrom(
         this.httpService.post(saveUrl, syncPayload, {
           headers: {
