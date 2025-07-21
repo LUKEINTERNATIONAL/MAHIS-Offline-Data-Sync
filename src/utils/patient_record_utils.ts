@@ -377,6 +377,8 @@ function compareObjects(obj1: any, obj2: any, section: string): any[] {
 
 // Helper function to compare arrays - MODIFIED to detect removals
 function compareArrays(arr1: any[], arr2: any[], section: string): any[] {
+  arr1 = Array.isArray(arr1) ? arr1 : [];
+  arr2 = Array.isArray(arr2) ? arr2 : [];
   const changes: any[] = [];
   const arr1Map = new Map(arr1.map(item => [JSON.stringify(item), item])); // Use stringified for generic comparison
   const arr2Map = new Map(arr2.map(item => [JSON.stringify(item), item]));
