@@ -122,16 +122,16 @@ interface PatientData {
     }
   
     // Check birth registration data
-    if (existingData.birthRegistration && incomingData.birthRegistration) {
-      const birthRegChanges = compareArraysByConceptId(
-        existingData.birthRegistration,
-        incomingData.birthRegistration,
-        'birthRegistration'
-      );
-      if (birthRegChanges.length > 0) {
-        changes.push(...birthRegChanges);
-      }
-    }
+    // if (existingData.birthRegistration && incomingData.birthRegistration) {
+    //   const birthRegChanges = compareArraysByConceptId(
+    //     existingData.birthRegistration,
+    //     incomingData.birthRegistration,
+    //     'birthRegistration'
+    //   );
+    //   if (birthRegChanges.length > 0) {
+    //     changes.push(...birthRegChanges);
+    //   }
+    // }
   
     // Check vaccine schedule
     if (existingData.vaccineSchedule?.vaccine_schedule && incomingData.vaccineSchedule?.vaccine_schedule) {
@@ -587,13 +587,13 @@ export function sophisticatedMergePatientData(existingData: PatientData, incomin
   }
 
   // Merge birth registration data
-  if (incomingData.birthRegistration) {
-    mergedData.birthRegistration = mergeArraysById(
-      mergedData.birthRegistration || [],
-      incomingData.birthRegistration,
-      'concept_id'
-    );
-  }
+  // if (incomingData.birthRegistration) {
+  //   mergedData.birthRegistration = mergeArraysById(
+  //     mergedData.birthRegistration || [],
+  //     incomingData.birthRegistration,
+  //     'concept_id'
+  //   );
+  // }
 
   // Merge vitals with improved saved/unsaved handling
   if (incomingData.vitals) {
