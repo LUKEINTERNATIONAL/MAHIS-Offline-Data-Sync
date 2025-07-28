@@ -90,7 +90,7 @@ async function bootstrap() {
   app.enableCors();
 
   // Listen on all network interfaces
-  const port_number = process.env.PORT || 3002;
+  const port_number = process.env.PORT || 3003;
   process.env.PORT = port_number.toString();
 
   // Try to detect server IP
