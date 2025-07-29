@@ -1089,8 +1089,8 @@ export function sophisticatedMergePatientData(existingData: PatientData, incomin
           if (existingNcdSection) {
             // Update existing section's NCD_Drug_Orders
             existingNcdSection.NCD_Drug_Orders = mergeNcdDrugOrders(
-                existingNcdSection.NCD_Drug_Orders || [],
-                deduplicatedNcdOrders
+              existingNcdSection.NCD_Drug_Orders || [],
+              deduplicatedNcdOrders
             );
           } else {
             // Add new section with deduplicated orders to unsaved
@@ -1100,51 +1100,33 @@ export function sophisticatedMergePatientData(existingData: PatientData, incomin
             });
           }
         } else if (existingNcdSection) {
-             // If deduplicated orders are empty, and there was an existing NCD section,
-             // consider if it should be cleared or removed. For now, we'll keep it empty.
-             existingNcdSection.NCD_Drug_Orders = [];
+          existingNcdSection.NCD_Drug_Orders = [];
         }
 
-        // Remove processed NCD section from the incomingUnsaved for further processing
-        // Filter out the NCD section from the incomingUnsaved array copy
+        // Now merge the rest of the unsaved (non-NCD) orders without removing existing ones
         const incomingNonNcdOrders = incomingUnsaved.filter(
-            order => !(order.NCD_Drug_Orders?.length > 0)
+          order => !(order.NCD_Drug_Orders?.length > 0)
         );
 
-        // Handle remaining regular medication orders (non-NCD) from incoming unsaved
-        const mergedUnsavedRegularOrders = [...(mergedData.MedicationOrder.unsaved?.filter(order => !order.NCD_Drug_Orders) || [])];
         incomingNonNcdOrders.forEach(order => {
-            // Deduplicate against saved medications by key (drug_id, start_date)
-            const orderKey = createMedicationKey(order.drug_id, order.start_date);
-            const isSaved = savedMedications.some(saved =>
-                createMedicationKey(saved.drug_id, saved.start_date) === orderKey
-            );
+          const orderKey = createMedicationKey(order.drug_id, order.start_date);
+          const isSaved = savedMedications.some(saved =>
+            createMedicationKey(saved.drug_id, saved.start_date) === orderKey
+          );
+          const existsInUnsaved = mergedData.MedicationOrder.unsaved.some(existingOrder =>
+            !existingOrder.NCD_Drug_Orders &&
+            createMedicationKey(existingOrder.drug_id, existingOrder.start_date) === orderKey
+          );
 
-            if (!isSaved) {
-                // Check if it already exists in the merged unsaved regular orders by key
-                const existingIndex = mergedUnsavedRegularOrders.findIndex(existingOrder =>
-                    createMedicationKey(existingOrder.drug_id, existingOrder.start_date) === orderKey
-                );
-
-                if (existingIndex !== -1) {
-                    // Update existing unsaved order
-                    mergedUnsavedRegularOrders[existingIndex] = mergeObjects(mergedUnsavedRegularOrders[existingIndex], order);
-                } else {
-                    // Add new unsaved order
-                    mergedUnsavedRegularOrders.push(order);
-                }
-            }
+          if (!isSaved && !existsInUnsaved) {
+            mergedData.MedicationOrder.unsaved.push(order);
+          }
+          // Optionally, update if existsInUnsaved
         });
 
-        // Reconstruct the unsaved array in mergedData
-        mergedData.MedicationOrder.unsaved = mergedUnsavedRegularOrders;
-        if (existingNcdSection) {
-            // Ensure the NCD section (possibly updated) is also included
-            mergedData.MedicationOrder.unsaved.push(existingNcdSection);
-        }
-
-
-      } else { // If no NCD_Drug_Orders in incoming, just merge the rest of unsaved
+        // No need to reconstruct the unsaved array, just update in place
+      } else {
+        // If no NCD_Drug_Orders in incoming, just merge the rest of unsaved
           const mergedUnsavedRegularOrders = [...(mergedData.MedicationOrder.unsaved || [])];
           incomingUnsaved.forEach(order => {
               const orderKey = createMedicationKey(order.drug_id, order.start_date);
