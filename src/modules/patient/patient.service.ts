@@ -38,6 +38,52 @@ export class PatientService {
     return patients.map(patient => this.parsePatientData(patient));
   }
 
+  async findUnsyncedPatients(): Promise<Patient[]> {
+    this.logger.log('Fetching patients with sync_status: "unsynced"');
+    try {
+      let patients: Patient[] = [];
+      if (this.isMongoDB) {
+        // Utilize $runCommandRaw for MongoDB as per your request
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'Patient', // The collection name
+          pipeline: [
+            { $match: { "data.sync_status": "unsynced" } }, // Filter by sync_status
+            // { $sort: { createdAt: -1 } } // Optional: add sorting if needed, similar to findDuplicatesByDataId
+          ],
+          cursor: {} // Required for $runCommandRaw to return results
+        });
+
+        patients = (result?.cursor?.firstBatch as Patient[]) || [];
+      } else if (this.isSQLite) {
+        // For SQLite, use a raw query to filter JSON field
+        patients = await (this.prisma as any).$queryRawUnsafe(
+          `SELECT * FROM patients WHERE json_extract(data, '$.sync_status') = ?`,
+          'unsynced'
+        );
+      } else {
+        // Fallback: try to filter in memory
+        patients = await this.prisma.patient.findMany();
+        patients = patients.filter((patient: any) => {
+          let data = patient.data;
+          if (typeof data === 'string') {
+            try {
+              data = JSON.parse(data);
+            } catch {
+              return false;
+            }
+          }
+          return data && data.sync_status === 'unsynced';
+        });
+      }
+      // Ensure data is parsed for SQLite, consistent with other methods
+      return patients.map(patient => this.parsePatientData(patient));
+    } catch (error) {
+      this.logger.error('Error fetching unsynced patients:', error);
+      throw error; // Re-throw to allow higher-level error handling
+    }
+  }
+
+
   async findById(id: string): Promise<Patient | null> {
     const patient = await this.prisma.patient.findUnique({
       where: { id }

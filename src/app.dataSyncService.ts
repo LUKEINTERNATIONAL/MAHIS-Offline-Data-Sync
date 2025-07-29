@@ -51,7 +51,7 @@ export class DataSyncService {
       }
 
       this.logger.log('Fetching all patient records from database');
-      const allRecords = await this.patientService.findAll();
+      const allRecords = await this.patientService.findUnsyncedPatients();
       
       if (!allRecords || allRecords.length === 0) {
         this.logger.log('No records found in database to sync');
