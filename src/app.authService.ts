@@ -311,7 +311,7 @@ async function syncPatientIds(
       logger.error('Failed to authenticate');
     }
 
-    const PAGE_SIZE = 50;
+    const PAGE_SIZE = 5;
     let currentPage = 1;
     let totalPatients = 0;
     let processedPatients = 0;
