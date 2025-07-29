@@ -46,7 +46,7 @@ export class DDEService {
 
             if (documents.length === 0) {
                 this.logger.log('No documents with null status found');
-                return null;
+                return [] as any; // Return empty array if no documents found
             }
 
             // Update the found document to pending status
