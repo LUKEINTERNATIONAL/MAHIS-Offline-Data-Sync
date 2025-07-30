@@ -47,6 +47,14 @@ export class AppController {
     return await this.appService.getAllPatientIds();
   }
 
+  @Post('is-patient-possible-duplicate')
+  async isPatientPossibleDuplicate(@Body() payload: PayloadDto): Promise<any> {
+    if (!payload || !payload.data) {
+      throw new BadRequestException('Invalid payload format. Expected payload with data.');
+    }
+    return await this.patientService.isPatientPossibleDuplicate(payload.data);
+  }   
+
   @Get('patient/:patientId/payload')
 async getPatientPayload(@Param('patientId') patientId: string) {
   const payload = await this.appService.getPatientPayload(patientId);

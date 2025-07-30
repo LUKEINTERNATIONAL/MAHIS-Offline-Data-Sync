@@ -1,9 +1,75 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
 import { Patient, Prisma } from '@prisma/client';
 import * as _ from 'lodash';
+import { PrismaService } from '../prisma/prisma.service'; // Assuming this path is correct
 
+// --- Type Definitions (Include these in your types file or at the top of PatientService) ---
+interface PatientDemographics {
+  given_name: string;
+  middle_name: string;
+  family_name: string;
+  gender: string;
+  birthdate: string; // YYYY-MM-DD
+  birthdate_estimated: boolean;
+  home_region: string;
+  home_district: string;
+  home_traditional_authority: string;
+  home_village: string;
+  current_region: string;
+  current_district: string;
+  current_traditional_authority: string;
+  current_village: string;
+  country: string;
+  landmark: string;
+  cell_phone_number: string;
+  occupation: string;
+  marital_status: string;
+  religion: string;
+  education_level: string;
+}
+
+interface DuplicateMatchResult {
+  isPossibleDuplicate: boolean;
+  bestMatchScore: number;
+  bestMatchPatient: Patient | null;
+  potentialMatches: Array<{ patient: Patient; score: number }>;
+}
+
+/**
+ * Recursively converts BigInt values within an object or array to strings.
+ * This is necessary because JSON.stringify cannot serialize BigInts directly.
+ * @param obj The object or array to process.
+ * @returns A new object/array with BigInts converted to strings.
+ */
+function convertBigIntToString(obj: any): any {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj; // Return primitives directly
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertBigIntToString(item)); // Recurse for array elements
+  }
+
+  const newObj: { [key: string]: any } = {};
+  for (const key in obj) {
+    // Ensure it's an own property to avoid iterating prototype chain
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      if (typeof value === 'bigint') {
+        newObj[key] = value.toString(); // Convert BigInt to string
+      } else if (typeof value === 'object' && value !== null) {
+        newObj[key] = convertBigIntToString(value); // Recurse for nested objects
+      } else {
+        newObj[key] = value; // Copy other values directly
+      }
+    }
+  }
+  return newObj;
+}
+
+
+// --- Start of PatientService Class (assuming you have the rest of the class definition) ---
 @Injectable()
 export class PatientService {
   private readonly logger = new Logger(PatientService.name);
@@ -43,25 +109,21 @@ export class PatientService {
     try {
       let patients: Patient[] = [];
       if (this.isMongoDB) {
-        // Utilize $runCommandRaw for MongoDB as per your request
         const result = await (this.prisma as any).$runCommandRaw({
-          aggregate: 'Patient', // The collection name
+          aggregate: 'patients', // Use actual collection name if different
           pipeline: [
-            { $match: { "data.sync_status": "unsynced" } }, // Filter by sync_status
-            // { $sort: { createdAt: -1 } } // Optional: add sorting if needed, similar to findDuplicatesByDataId
+            { $match: { "data.sync_status": "unsynced" } },
           ],
-          cursor: {} // Required for $runCommandRaw to return results
+          cursor: {}
         });
 
         patients = (result?.cursor?.firstBatch as Patient[]) || [];
       } else if (this.isSQLite) {
-        // For SQLite, use a raw query to filter JSON field
-        patients = await (this.prisma as any).$queryRawUnsafe(
-          `SELECT * FROM patients WHERE json_extract(data, '$.sync_status') = ?`,
-          'unsynced'
-        );
+        patients = await (this.prisma as any).$queryRaw<Patient[]>`
+          SELECT * FROM patients WHERE json_extract(data, '$.sync_status') = 'unsynced'
+        `;
       } else {
-        // Fallback: try to filter in memory
+        // Fallback for other/unconfigured DB types
         patients = await this.prisma.patient.findMany();
         patients = patients.filter((patient: any) => {
           let data = patient.data;
@@ -75,14 +137,236 @@ export class PatientService {
           return data && data.sync_status === 'unsynced';
         });
       }
-      // Ensure data is parsed for SQLite, consistent with other methods
       return patients.map(patient => this.parsePatientData(patient));
     } catch (error) {
       this.logger.error('Error fetching unsynced patients:', error);
-      throw error; // Re-throw to allow higher-level error handling
+      throw error;
     }
   }
 
+  async isPatientPossibleDuplicate(
+    inputData: PatientDemographics,
+  ): Promise<DuplicateMatchResult> {
+    this.logger.log(`Checking for possible duplicates for: ${inputData.given_name} ${inputData.family_name}`);
+
+    // --- Input Data Normalization (Ensures string inputs are never null/undefined for queries) ---
+    // Create a mutable copy and normalize string fields
+    const normalizedInputData: PatientDemographics = { ...inputData };
+    for (const key of Object.keys(normalizedInputData) as Array<keyof PatientDemographics>) {
+      if (typeof normalizedInputData[key] === 'string' && (normalizedInputData[key] === null || normalizedInputData[key] === undefined)) {
+        (normalizedInputData[key] as string) = ''; // Convert null/undefined strings to empty strings
+      }
+    }
+
+    // --- Scoring Weights (can be adjusted) ---
+    const WEIGHTS = {
+      given_name: 20,
+      family_name: 20,
+      gender: 15,
+      birthdate: 25, // Strongest match
+      cell_phone_number: 10,
+      home_district: 5,
+      home_traditional_authority: 5,
+      home_village: 5,
+      // Total possible score: 105
+    };
+
+    // --- Thresholds ---
+    const DUPLICATE_THRESHOLD = 60; // A score above this is considered a definite possible duplicate
+    const MIN_POTENTIAL_MATCH_SCORE = 30; // Minimum score to be included in the 'potentialMatches' list
+
+    let patientsWithScores: { patient: Patient; score: number }[] = [];
+
+    try {
+      if (this.isMongoDB) {
+        // MongoDB aggregation pipeline for scoring
+        const pipeline = [
+          // Optional: Initial $match to narrow down documents for performance.
+          // This requires some input fields to be present and reliable.
+          // If inputData.given_name or family_name might be empty, adjust this $match or remove it.
+          {
+            $match: {
+                $or: [
+                    { "data.personInformation.given_name": { $regex: `^${normalizedInputData.given_name}`, $options: 'i' } },
+                    { "data.personInformation.family_name": { $regex: `^${normalizedInputData.family_name}`, $options: 'i' } }
+                ],
+                // Add more strong filters if always available (e.g., gender, or birthdate year)
+                "data.personInformation.gender": normalizedInputData.gender,
+                "data.personInformation.birthdate": normalizedInputData.birthdate,
+            }
+          },
+          {
+            $addFields: {
+              match_score: {
+                $add: [
+                  // Given Name (case-insensitive, starts with)
+                  { $cond: [{ $regexMatch: { input: "$data.personInformation.given_name", regex: `^${normalizedInputData.given_name}`, options: "i" } }, WEIGHTS.given_name, 0] },
+                  // Family Name (case-insensitive, starts with)
+                  { $cond: [{ $regexMatch: { input: "$data.personInformation.family_name", regex: `^${normalizedInputData.family_name}`, options: "i" } }, WEIGHTS.family_name, 0] },
+                  // Gender (exact match - safe as $eq handles null/missing stored values)
+                  { $cond: [{ $eq: [{ $ifNull: ["$data.personInformation.gender", ""] }, normalizedInputData.gender] }, WEIGHTS.gender, 0] },
+                  // Birthdate (exact match - safe as $eq handles null/missing stored values)
+                  { $cond: [{ $eq: [{ $ifNull: ["$data.personInformation.birthdate", ""] }, normalizedInputData.birthdate] }, WEIGHTS.birthdate, 0] },
+                  // Cell Phone Number (normalize by trimming spaces/dashes for both stored and input)
+                  { $cond: [
+                      { $eq: [
+                          { $trim: { input: { $ifNull: ["$data.personInformation.cell_phone_number", ""] }, chars: " -()" } }, // Safely handle null/missing stored field
+                          normalizedInputData.cell_phone_number.replace(/[\s()-]/g, '') // Input is already normalized to string
+                      ]},
+                      WEIGHTS.cell_phone_number,
+                      0
+                    ]
+                  },
+                  // Home District (case-insensitive, exact match)
+                  { $cond: [{ $eq: [{ $toLower: { $ifNull: ["$data.personInformation.home_district", ""] } }, normalizedInputData.home_district.toLowerCase()] }, WEIGHTS.home_district, 0] },
+                  // Home Traditional Authority (case-insensitive, exact match)
+                  { $cond: [{ $eq: [{ $toLower: { $ifNull: ["$data.personInformation.home_traditional_authority", ""] } }, normalizedInputData.home_traditional_authority.toLowerCase()] }, WEIGHTS.home_traditional_authority, 0] },
+                  // Home Village (case-insensitive, exact match)
+                  { $cond: [{ $eq: [{ $toLower: { $ifNull: ["$data.personInformation.home_village", ""] } }, normalizedInputData.home_village.toLowerCase()] }, WEIGHTS.home_village, 0] },
+                ],
+              },
+            },
+          },
+          {
+            $match: {
+              match_score: { $gte: MIN_POTENTIAL_MATCH_SCORE },
+            },
+          },
+          {
+            $sort: { match_score: -1 },
+          },
+          // Optional: { $limit: 10 }
+        ];
+
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'patients',
+          pipeline: pipeline,
+          cursor: {},
+        });
+
+        const rawMatches = (result?.cursor?.firstBatch as any[]) || [];
+        patientsWithScores = rawMatches.map((doc: any) => ({
+          patient: this.parsePatientData(doc),
+          score: doc.match_score,
+        }));
+
+      } else if (this.isSQLite) {
+        // Prepare normalized input phone number for SQLite query
+        const normalizedInputPhoneForSql = normalizedInputData.cell_phone_number.replace(/[\s()-]/g, '');
+
+        // Corrected SQLite raw query using a subquery to filter with WHERE on calculated score
+        const sqlQuery = Prisma.sql`
+          SELECT
+              id,
+              "patientID",
+              message,
+              timestamp,
+              data,
+              "createdAt",
+              "updatedAt",
+              match_score
+          FROM (
+              SELECT
+                  id,
+                  "patientID",
+                  message,
+                  timestamp,
+                  data,
+                  "createdAt",
+                  "updatedAt",
+                  -- Calculate score for each patient
+                  (
+                    -- Given Name (case-insensitive, starts with). json_extract returns NULL for missing path, LOWER(NULL) is NULL, LIKE NULL is NULL. Safe.
+                    CASE WHEN LOWER(json_extract(data, '$.personInformation.given_name')) LIKE LOWER(${normalizedInputData.given_name} || '%') THEN ${WEIGHTS.given_name} ELSE 0 END +
+                    -- Family Name (case-insensitive, starts with)
+                    CASE WHEN LOWER(json_extract(data, '$.personInformation.family_name')) LIKE LOWER(${normalizedInputData.family_name} || '%') THEN ${WEIGHTS.family_name} ELSE 0 END +
+                    -- Gender (exact match)
+                    CASE WHEN json_extract(data, '$.personInformation.gender') = ${normalizedInputData.gender} THEN ${WEIGHTS.gender} ELSE 0 END +
+                    -- Birthdate (exact match)
+                    CASE WHEN json_extract(data, '$.personInformation.birthdate') = ${normalizedInputData.birthdate} THEN ${WEIGHTS.birthdate} ELSE 0 END +
+                    -- Cell Phone Number (safe normalization and exact match)
+                    CASE WHEN REPLACE(REPLACE(REPLACE(json_extract(data, '$.personInformation.cell_phone_number'), ' ', ''), '-', ''), '(', '') = ${normalizedInputPhoneForSql} THEN ${WEIGHTS.cell_phone_number} ELSE 0 END +
+                    -- Home District (case-insensitive, exact match)
+                    CASE WHEN LOWER(json_extract(data, '$.personInformation.home_district')) = LOWER(${normalizedInputData.home_district}) THEN ${WEIGHTS.home_district} ELSE 0 END +
+                    -- Home Traditional Authority (case-insensitive, exact match)
+                    CASE WHEN LOWER(json_extract(data, '$.personInformation.home_traditional_authority')) = LOWER(${normalizedInputData.home_traditional_authority}) THEN ${WEIGHTS.home_traditional_authority} ELSE 0 END +
+                    -- Home Village (case-insensitive, exact match)
+                    CASE WHEN LOWER(json_extract(data, '$.personInformation.home_village')) = LOWER(${normalizedInputData.home_village}) THEN ${WEIGHTS.home_village} ELSE 0 END
+                  ) AS match_score
+              FROM patients
+          ) AS scored_patients
+          WHERE match_score >= ${MIN_POTENTIAL_MATCH_SCORE}
+          ORDER BY match_score DESC;
+        `;
+
+        const rawMatches: any[] = await (this.prisma as any).$queryRaw(sqlQuery);
+        patientsWithScores = rawMatches.map((row: any) => ({
+          patient: this.parsePatientData(row as Patient),
+          score: row.match_score ? Number(row.match_score) : 0,
+        }));
+
+      } else {
+        // Fallback: In-memory filter and scoring
+        this.logger.warn('Unknown database provider, performing in-memory duplicate check. This can be inefficient for large datasets.');
+        const allPatients = await this.prisma.patient.findMany();
+
+        patientsWithScores = allPatients.map(patient => {
+          let score = 0;
+          const storedPatientData = this.parsePatientData(patient).data as any;
+
+          if (!storedPatientData || !storedPatientData.personInformation) {
+            return { patient, score: 0 };
+          }
+
+          const personInfo = storedPatientData.personInformation;
+
+          const getSafeLower = (val: any) => (val ? String(val).toLowerCase() : '');
+          const getSafeNormalizedPhone = (val: any) => (val ? String(val).replace(/[\s()-]/g, '') : '');
+
+          if (getSafeLower(personInfo.given_name).startsWith(getSafeLower(normalizedInputData.given_name))) {
+            score += WEIGHTS.given_name;
+          }
+          if (getSafeLower(personInfo.family_name).startsWith(getSafeLower(normalizedInputData.family_name))) {
+            score += WEIGHTS.family_name;
+          }
+          if (getSafeLower(personInfo.gender) === getSafeLower(normalizedInputData.gender)) {
+            score += WEIGHTS.gender;
+          }
+          if (personInfo.birthdate === normalizedInputData.birthdate) {
+            score += WEIGHTS.birthdate;
+          }
+          if (getSafeNormalizedPhone(personInfo.cell_phone_number) === getSafeNormalizedPhone(normalizedInputData.cell_phone_number)) {
+            score += WEIGHTS.cell_phone_number;
+          }
+          if (getSafeLower(personInfo.home_district) === getSafeLower(normalizedInputData.home_district)) {
+            score += WEIGHTS.home_district;
+          }
+          if (getSafeLower(personInfo.home_traditional_authority) === getSafeLower(normalizedInputData.home_traditional_authority)) {
+            score += WEIGHTS.home_traditional_authority;
+          }
+          if (getSafeLower(personInfo.home_village) === getSafeLower(normalizedInputData.home_village)) {
+            score += WEIGHTS.home_village;
+          }
+
+          return { patient, score };
+        })
+          .filter(match => match.score >= MIN_POTENTIAL_MATCH_SCORE)
+          .sort((a, b) => b.score - a.score);
+      }
+
+      const bestMatch = patientsWithScores.length > 0 ? patientsWithScores[0] : null;
+
+      return {
+        isPossibleDuplicate: bestMatch ? bestMatch.score >= DUPLICATE_THRESHOLD : false,
+        bestMatchScore: bestMatch ? bestMatch.score : 0,
+        bestMatchPatient: bestMatch ? bestMatch.patient : null,
+        potentialMatches: patientsWithScores,
+      };
+    } catch (error) {
+      this.logger.error(`Error checking for possible patient duplicates: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 
   async findById(id: string): Promise<Patient | null> {
     const patient = await this.prisma.patient.findUnique({
@@ -126,14 +410,12 @@ export class PatientService {
       
       if (data.data) {
         if (this.isMongoDB) {
-          // For MongoDB, we can use nested updates
           const existingPatient = await this.findByPatientId(patientID);
           if (existingPatient) {
             const existingData = existingPatient.data as any;
             updateData.data = { ...existingData, ...data.data };
           }
         } else {
-          // For SQLite, merge with existing JSON data
           const existingPatient = await this.findByPatientId(patientID);
           if (existingPatient) {
             updateData.data = typeof data.data === 'string' ? data.data : JSON.stringify(data.data);
@@ -177,7 +459,7 @@ export class PatientService {
       
       return this.parsePatientData(patient);
     } catch (error) {
-      if (error.code === 'P2025') { // Record not found
+      if (error.code === 'P2025') {
         return null;
       }
       throw error;
@@ -192,7 +474,7 @@ export class PatientService {
       
       return this.parsePatientData(patient);
     } catch (error) {
-      if (error.code === 'P2025') { // Record not found
+      if (error.code === 'P2025') {
         return null;
       }
       throw error;
@@ -247,39 +529,35 @@ async searchPatientDataWithRawQuery(
   this.logger.log(`Pagination: page=${page}, per_page=${per_page}, skip=${skip}`);
 
   if (this.isMongoDB) {
-    // MongoDB raw query approach
     try {
       const matchStage: any = {};
       
-      if (searchCriteria.given_name) {
-        const givenNameInput = searchCriteria.given_name.toString().trim();
-        const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
-        
-        if (isEntirelyNumeric) {
-          matchStage["data.NcdID"] = { $regex: `-${givenNameInput}`, $options: 'i' };
-        } else {
-          matchStage["data.personInformation.given_name"] = { 
-            $regex: `^${givenNameInput}`, 
-            $options: 'i' 
-          };
-        }
+      const safeGivenName = searchCriteria.given_name ? String(searchCriteria.given_name).trim() : '';
+      const safeFamilyName = searchCriteria.family_name ? String(searchCriteria.family_name).trim() : '';
+      const safeGender = searchCriteria.gender ? String(searchCriteria.gender).trim() : '';
+
+
+      if (safeGivenName) {
+        matchStage["data.personInformation.given_name"] = { 
+          $regex: `^${safeGivenName}`, 
+          $options: 'i' 
+        };
       }
 
-      if (searchCriteria.family_name) {
+      if (safeFamilyName) {
         matchStage["data.personInformation.family_name"] = { 
-          $regex: `^${searchCriteria.family_name}`, 
+          $regex: `^${safeFamilyName}`, 
           $options: 'i' 
         };
       }
 
-      if (searchCriteria.gender) {
+      if (safeGender) {
         matchStage["data.personInformation.gender"] = { 
-          $regex: `^${searchCriteria.gender}`, 
+          $regex: `^${safeGender}`, 
           $options: 'i' 
         };
       }
 
-      // Get total count
       const countResult = await (this.prisma as any).$runCommandRaw({
         aggregate: 'patients',
         pipeline: [
@@ -291,7 +569,6 @@ async searchPatientDataWithRawQuery(
       
       total = countResult?.cursor?.firstBatch?.[0]?.total || 0;
 
-      // Get paginated results  
       const result = await (this.prisma as any).$runCommandRaw({
         aggregate: 'patients',
         pipeline: [
@@ -313,44 +590,37 @@ async searchPatientDataWithRawQuery(
       const conditions: string[] = [];
       const params: any[] = [];
       
-      if (searchCriteria.given_name) {
-        const givenNameInput = searchCriteria.given_name.toString().trim().toLowerCase();
-        const isEntirelyNumeric = /^\d+$/.test(givenNameInput);
+      const safeGivenName = searchCriteria.given_name ? String(searchCriteria.given_name).trim() : '';
+      const safeFamilyName = searchCriteria.family_name ? String(searchCriteria.family_name).trim() : '';
+      const safeGender = searchCriteria.gender ? String(searchCriteria.gender).trim() : '';
 
-        if (isEntirelyNumeric) {
-          conditions.push(`LOWER(json_extract(data, '$.NcdID')) LIKE ?`);
-          params.push(`%-${givenNameInput}%`);
-        } else {
-          conditions.push(`LOWER(json_extract(data, '$.personInformation.given_name')) LIKE ?`);
-          params.push(`${givenNameInput}%`);
-        }
+      if (safeGivenName) {
+        conditions.push(`LOWER(json_extract(data, '$.personInformation.given_name')) LIKE ?`);
+        params.push(`${safeGivenName.toLowerCase()}%`);
       }
 
 
-      if (searchCriteria.family_name) {
+      if (safeFamilyName) {
         conditions.push(`LOWER(json_extract(data, '$.personInformation.family_name')) LIKE ?`);
-        params.push(`${searchCriteria.family_name.toLowerCase()}%`);
+        params.push(`${safeFamilyName.toLowerCase()}%`);
       }
 
-      if (searchCriteria.gender) {
+      if (safeGender) {
         conditions.push(`LOWER(json_extract(data, '$.personInformation.gender')) LIKE ?`);
-        params.push(`${searchCriteria.gender.toLowerCase()}%`);
+        params.push(`${safeGender.toLowerCase()}%`);
       }
 
       if (conditions.length > 0) {
        
         const whereClause = conditions.join(' AND ');
         
-        // Get total count
         const countQuery = `SELECT COUNT(*) as total FROM patients WHERE ${whereClause}`;
         const countResult = await (this.prisma as any).$queryRawUnsafe(countQuery, ...params);
         total = countResult[0]?.total ? Number(countResult[0].total) : 0;
 
-        // Get paginated results
         const dataQuery = `SELECT * FROM patients WHERE ${whereClause} ORDER BY createdAt DESC LIMIT ? OFFSET ?`;
         patients = await (this.prisma as any).$queryRawUnsafe(dataQuery, ...params, per_page, skip);
       } else {
-        // No search criteria
         total = await this.prisma.patient.count();
         patients = await this.prisma.patient.findMany({
           skip,
@@ -388,19 +658,18 @@ async searchPatientDataWithRawQuery(
       let patients: Patient[] = [];
 
       if (this.isMongoDB) {
-        // For MongoDB, the patient "data" object uses "ID" as the key
         const result = await (this.prisma as any).$runCommandRaw({
-          aggregate: 'Patient',
+          aggregate: 'patients',
           pipeline: [
-        { $match: { "data.ID": dataId } },
-        { $sort: { createdAt: -1 } }
+            { $match: { "data.ID": dataId } },
+            { $sort: { createdAt: -1 } }
           ],
           cursor: {}
         });
 
         patients = (result?.cursor?.firstBatch as Patient[]) || [];
       } else {
-        // For SQLite, the patient "data" object uses "id" as the key
+        // Cast result of $queryRaw to the expected Patient[] type to resolve ts(2347)
         patients = await (this.prisma as any).$queryRaw<Patient[]>`
           SELECT * FROM patients
           WHERE json_extract(data, '$.id') = ${dataId}
@@ -456,7 +725,6 @@ async searchPatientDataWithRawQuery(
       this.logger.log(`Keeping patient with id: ${keptPatient.id} (created: ${keptPatient.createdAt})`);
       this.logger.log(`Removing ${duplicatesToRemove.length} duplicate(s)`);
 
-      // Remove the duplicates
       const idsToRemove = duplicatesToRemove.map(p => p.id);
       const deleteResult = await this.prisma.patient.deleteMany({
         where: {
@@ -477,7 +745,6 @@ async searchPatientDataWithRawQuery(
     }
   }
 
-  // Legacy methods for backward compatibility
   async update(patientID: string, data: Partial<Patient>): Promise<Patient | null> {
     return this.updateByPatientId(patientID, data);
   }
@@ -486,20 +753,24 @@ async searchPatientDataWithRawQuery(
     return this.deleteByPatientId(patientID);
   }
 
-  // Helper methods
   private parsePatientData(patient: Patient): Patient {
+    let parsedPatient = patient;
+
+    // Handle JSON parsing for SQLite 'data' field
     if (this.isSQLite && typeof patient.data === 'string') {
       try {
-        return {
+        parsedPatient = {
           ...patient,
           data: JSON.parse(patient.data)
         };
       } catch (error) {
         this.logger.error(`Error parsing JSON data for patient ${patient.id}:`, error);
-        return patient;
+        // Fallback to original if parsing fails, but BigInt conversion will still attempt
       }
     }
-    return patient;
+
+    // Crucial: Recursively convert any BigInt values to strings to prevent JSON serialization errors
+    return convertBigIntToString(parsedPatient);
   }
 
   private prepareUpdateData(data: Partial<Patient>): Prisma.PatientUpdateInput {

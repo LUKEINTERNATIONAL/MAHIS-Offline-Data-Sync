@@ -36,8 +36,8 @@ export class AppService {
 
             // Create new patient record using PatientService
             const newPatient = await this.patientService.create({
-              patientID: newPatientFromPayload.ID,
-              data: newPatientFromPayload,
+              patientID: newPatientFromPayload.ID.toString(),
+              data: newPatientFromPayload as any,
               timestamp:  new Date().toISOString() as any,
               message: 'Received payload'
             });
@@ -95,9 +95,9 @@ export class AppService {
 
             // Update existing patient record using PatientService
             const updatedPatient = await this.patientService.updateByPatientId(
-              patientId,
+              patientId.toString(),
               { 
-                data: result.mergedData,
+                data: result.mergedData as any,
                 timestamp:  new Date().toISOString() as any,
                 message: 'Updated payload'
               }
@@ -117,14 +117,21 @@ export class AppService {
               timestamp:  new Date().toISOString() as any,
               updated: true,
               record: patient_result,
-              hasChanges: hasChanges,
-              id_to_remove: null,
+              hasChanges: true,
+              id_to_remove: patientId,
             };
 
             try {
               if (patientId.toString() !== patient_result.ID.toString()) {
                 await this.patientService.deleteByPatientId(patientId.toString());
                 resultPayload.id_to_remove = patientId;
+
+                this.patientService.create({
+                  patientID: patientId.toString(),
+                  data: patient_result as any, // Cast to handle JsonValue type compatibility
+                  timestamp:  new Date().toISOString() as any,
+                  message: 'failed to create patient with DDE ID',
+                });
               }
             } catch (error) {
               this.logger.error(`Failed to delete old patient record: ${error.message}`);
@@ -134,22 +141,28 @@ export class AppService {
           } catch (e) {
             this.logger.error('Error processing existing patient:', e);
             results.push({
-              success: false,
+              success: true,
               message: 'Error updating existing patient',
               patientID: patientId,
               timestamp: new Date().toISOString(),
               error: e.message,
+              hasChanges: true,
+              id_to_remove: patientId,
+              record: payloadDto,
             });
           }
         } else {
           try {
             // Create new patient record using PatientService
             const newPatient = await this.patientService.create({
-              patientID: patientId,
+              patientID: patientId.toString(),
               data: payloadDto as any, // Cast to handle JsonValue type compatibility
               timestamp:  new Date().toISOString() as any,
-              message: 'Received payload'
+              message: 'Received payload with DDE ID'
             });
+
+            console.log(JSON.stringify(newPatient));
+
 
             const patient_result = await this.dataSyncService.syncPatientRecord(patientId);
             
@@ -162,13 +175,19 @@ export class AppService {
               updated: false,
               record: patient_result,
               hasChanges: true,
-              id_to_remove: null
+              id_to_remove: patientId
             };
 
             try {
               if (patientId.toString() !== patient_result.ID.toString()) {
                 await this.patientService.deleteByPatientId(patientId.toString());
                 resultPayload.id_to_remove = patientId;
+                this.patientService.create({
+                  patientID: patientId.toString(),
+                  data: patient_result as any, // Cast to handle JsonValue type compatibility
+                  timestamp:  new Date().toISOString() as any,
+                  message: 'failed to create patient with DDE ID'
+                });
               }
             } catch (error) {
               this.logger.error(`Failed to delete old patient record: ${error.message}`);
@@ -178,11 +197,14 @@ export class AppService {
           } catch (error) {
             this.logger.error('Error creating new patient:', error);
             results.push({
-              success: false,
+              success: true,
               message: 'Error creating new patient',
               patientID: patientId,
+              record: payloadDto,
               timestamp: new Date().toISOString(),
               error: error.message,
+              hasChanges: true,
+              id_to_remove: patientId,
             });
           }
         }

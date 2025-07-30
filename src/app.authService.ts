@@ -360,7 +360,7 @@ async function syncPatientIds(
       processedPatients += response.sync_patients.length;
       logger.log(`Processed ${processedPatients}/${totalPatients} patients`);
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     logger.log('Patient sync completed successfully');

@@ -8,3 +8,5 @@ mkcert local.dev 127.0.0.1 ::1
 mkcert offline.mahis 192.168.0.105 localhost 127.0.0.1
 
 pm2 startup
+
+lsof -ti:3002 | xargs kill -9
