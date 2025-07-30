@@ -191,8 +191,8 @@ export class PatientService {
                     { "data.personInformation.family_name": { $regex: `^${normalizedInputData.family_name}`, $options: 'i' } }
                 ],
                 // Add more strong filters if always available (e.g., gender, or birthdate year)
-                // "data.personInformation.gender": normalizedInputData.gender,
-                // "data.personInformation.birthdate": normalizedInputData.birthdate,
+                "data.personInformation.gender": normalizedInputData.gender,
+                "data.personInformation.birthdate": normalizedInputData.birthdate,
             }
           },
           {
