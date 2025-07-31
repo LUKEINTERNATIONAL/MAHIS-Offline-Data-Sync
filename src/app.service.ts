@@ -79,7 +79,7 @@ export class AppService {
             const newData = payloadDto;
             
             // Parse existing data or use empty object if parsing fails
-            let existingData = {};
+            let existingData = {} as any;
             try {
               existingData = existingPatient.data ? existingPatient.data : {};
             } catch (e) {
@@ -119,6 +119,7 @@ export class AppService {
               record: patient_result,
               hasChanges: true,
               id_to_remove: patientId,
+              id_to_remove2: existingData.patientID
             };
 
             try {
