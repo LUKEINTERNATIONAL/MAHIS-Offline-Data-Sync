@@ -360,7 +360,7 @@ export class PatientService {
         isPossibleDuplicate: bestMatch ? bestMatch.score >= DUPLICATE_THRESHOLD : false,
         bestMatchScore: bestMatch ? bestMatch.score : 0,
         bestMatchPatient: bestMatch ? bestMatch.patient : null,
-        potentialMatches: patientsWithScores,
+        potentialMatches: patientsWithScores.slice(0, 20),
       };
     } catch (error) {
       this.logger.error(`Error checking for possible patient duplicates: ${error.message}`, error.stack);
