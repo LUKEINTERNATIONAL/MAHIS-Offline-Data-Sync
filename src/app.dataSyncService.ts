@@ -136,7 +136,7 @@ async syncPatientRecord(patientID: string): Promise<any> {
     
     // Create a timeout promise that rejects after 1 second
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Sync timeout after 2 seconds')), 2000);
+      setTimeout(() => reject(new Error('Sync timeout after 1 seconds')), 1000);
     });
 
     // Race between the sync operation and timeout
