@@ -51,7 +51,7 @@ export class DataSyncService {
       }
 
       this.logger.log('Fetching all patient records from database');
-      const allRecords = await this.patientService.findUnsyncedPatients();
+      const allRecords = await this.patientService.findAll();
       
       if (!allRecords || allRecords.length === 0) {
         this.logger.log('No records found in database to sync');
@@ -117,50 +117,66 @@ export class DataSyncService {
   /**
    * Sync specific patient record by patientID
    */
-  async syncPatientRecord(patientID: string): Promise<any> {
-    try {
-      const isAuthenticated = await this.authService.ensureAuthenticated();
-      if (!isAuthenticated) {
-        this.logger.error("Failed to authenticate")
-      }
-
-      this.logger.log(`Syncing specific patient record: ${patientID}`);
-      const record = await this.patientService.findByPatientId(patientID);
-      
-      if (!record) {
-        this.logger.warn(`Patient record not found: ${patientID}`);
-        return { success: false, message: 'Patient record not found' };
-      }
-
-      const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
-      const syncResult = await this.syncSingleRecord(record, saveUrl);
-      
-      if (syncResult.success && syncResult.responseData) {
-        // Update the patient record with the API response
-        const updatedPatient = await this.patientService.updateByPatientId(patientID, {
-          data: syncResult.responseData,
-          message: 'Updated from API response',
-          timestamp:  new Date().toISOString() as any,
-        });
-
-        this.syncGateway.broadcastPatientUpdate(patientID, syncResult.responseData);
-        this.ddeService.markAsCompleted(syncResult.responseData.ID || patientID);
-
-        this.logger.log(`Successfully synced patient record: ${patientID}`);
-        return syncResult.responseData;
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
-      throw error;
+async syncPatientRecord(patientID: string): Promise<any> {
+  try {
+    const isAuthenticated = await this.authService.ensureAuthenticated();
+    if (!isAuthenticated) {
+      this.logger.error("Failed to authenticate")
     }
+
+    this.logger.log(`Syncing specific patient record: ${patientID}`);
+    const record = await this.patientService.findByPatientId(patientID);
+
+    if (!record) {
+      this.logger.warn(`Patient record not found: ${patientID}`);
+      return { success: false, message: 'Patient record not found' };
+    }
+
+    const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
+    
+    // Create a timeout promise that rejects after 1 second
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Sync timeout after 2 seconds')), 2000);
+    });
+
+    // Race between the sync operation and timeout
+    let syncResult;
+    try {
+      syncResult = await Promise.race([
+        this.syncSingleRecord(record, saveUrl),
+        timeoutPromise
+      ]);
+    } catch (timeoutError) {
+      this.logger.warn(`Sync timed out for patient ${patientID}: ${timeoutError.message}`);
+      return null;
+    }
+
+    if (syncResult.success && syncResult.responseData) {
+      // Update the patient record with the API response
+      const updatedPatient = await this.patientService.updateByPatientId(patientID, {
+        data: syncResult.responseData,
+        message: 'Updated from API response',
+        timestamp: new Date().toISOString() as any,
+      });
+
+      this.syncGateway.broadcastPatientUpdate(patientID, syncResult.responseData);
+      this.ddeService.markAsCompleted(syncResult.responseData.ID || patientID);
+
+      this.logger.log(`Successfully synced patient record: ${patientID}`);
+      return syncResult.responseData;
+    }
+
+    return null;
+  } catch (error) {
+    this.logger.error(`Failed to sync patient record ${patientID}: ${error.message}`);
+    throw error;
   }
+}
 
   /**
    * Sync patient record with custom payload
    */
-  async syncPatientRecordWithPayload(syncPayload: any): Promise<any> {
+  async syncPatientRecordWithPayload(syncPayload: any, isNew: boolean = false): Promise<any> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
@@ -172,12 +188,24 @@ export class DataSyncService {
       }
 
       const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
-      const syncResult = await this.syncSingleRecord(syncPayload, saveUrl);
-
-       if (syncResult.success && syncResult.responseData) {
-          this.logger.log('Sync from API response received:');
-          return syncResult.responseData;
+      
+      syncPayload = {
+        record: {
+          ...syncPayload
         }
+      }
+ 
+      const { data: responseData } = await lastValueFrom(
+        this.httpService.post(saveUrl, syncPayload, {
+          headers: {
+            Authorization: this.authService.getAuthToken(),
+            'Content-Type': 'application/json',
+          },
+        })
+      );
+
+      this.logger.log('Sync from API response received:');
+      return responseData;
     } catch (error) {
       this.logger.error(`Failed to sync patient record with payload: ${error.message}`);
       throw error;

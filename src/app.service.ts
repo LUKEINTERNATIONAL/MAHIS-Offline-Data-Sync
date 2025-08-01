@@ -116,7 +116,7 @@ export class AppService {
               patientID: updatedPatient.patientID,
               timestamp:  new Date().toISOString() as any,
               updated: true,
-              record: patient_result,
+              record: result.mergedData || patient_result ,
               hasChanges: true,
               id_to_remove: patientId,
               id_to_remove2: existingData.patientID
@@ -174,7 +174,7 @@ export class AppService {
               patientID: patient_result.ID || newPatient.patientID,
               timestamp: new Date().toISOString(),
               updated: false,
-              record: patient_result,
+              record: payloadDto || patient_result,
               hasChanges: true,
               id_to_remove: patientId
             };
