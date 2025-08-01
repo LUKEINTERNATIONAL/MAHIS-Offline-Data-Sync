@@ -32,7 +32,7 @@ export class AppService {
         if (!patientId) {
           try {
             console.log(JSON.stringify(payloadDto))
-            const newPatientFromPayload = await this.dataSyncService.syncPatientRecordWithPayload(payloadDto, true);
+            const newPatientFromPayload = await this.dataSyncService.syncPatientRecordWithPayload(payloadDto);
 
             // Create new patient record using PatientService
             const newPatient = await this.patientService.create({

@@ -160,7 +160,7 @@ export class DataSyncService {
   /**
    * Sync patient record with custom payload
    */
-  async syncPatientRecordWithPayload(syncPayload: any, isNew: boolean = false): Promise<any> {
+  async syncPatientRecordWithPayload(syncPayload: any): Promise<any> {
     try {
       const isAuthenticated = await this.authService.ensureAuthenticated();
       if (!isAuthenticated) {
@@ -172,24 +172,12 @@ export class DataSyncService {
       }
 
       const saveUrl = `${this.authService.getBaseUrl()}/save_patient_record`;
-      
-      syncPayload = {
-        record: {
-          ...syncPayload
-        }
-      }
- 
-      const { data: responseData } = await lastValueFrom(
-        this.httpService.post(saveUrl, syncPayload, {
-          headers: {
-            Authorization: this.authService.getAuthToken(),
-            'Content-Type': 'application/json',
-          },
-        })
-      );
+      const syncResult = await this.syncSingleRecord(syncPayload, saveUrl);
 
-      this.logger.log('Sync from API response received:');
-      return responseData;
+       if (syncResult.success && syncResult.responseData) {
+          this.logger.log('Sync from API response received:');
+          return syncResult.responseData;
+        }
     } catch (error) {
       this.logger.error(`Failed to sync patient record with payload: ${error.message}`);
       throw error;
