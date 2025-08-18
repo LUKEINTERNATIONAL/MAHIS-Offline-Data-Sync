@@ -99,6 +99,12 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     return stages.map(stage => stage.data);
   }
 
+  @Get('todays-visits')
+  async getTodaysVisits() {
+    const visits = await this.visitService.getTodaysVisits('14', '2025-08-15');
+    return visits
+  }
+
   @Get('search')
   async searchPatients(
     @Query('given_name') given_name?: string,

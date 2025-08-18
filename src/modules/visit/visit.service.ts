@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Visit, Prisma } from '@prisma/client';
+import { ServerTimeService } from '../SharedModule/shared.module';
 
 export interface CreateVisitDto {
   visit_id: number;
@@ -21,10 +22,80 @@ export interface VisitQueryOptions {
 @Injectable()
 export class VisitService {
   private readonly logger = new Logger(VisitService.name);
+  private readonly isMongoDB: boolean;
   
   constructor(
-    private readonly prisma: PrismaService
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly serverTimeService: ServerTimeService,
+  ) {
+    this.isMongoDB = process.env.DATABASE_PROVIDER === 'mongodb';
+  }
+
+async getTodaysVisits(programId: string, date: string): Promise<Visit[]> {
+    try {
+      this.logger.log(`Fetching visits for programId: ${programId} on date: ${date}`);
+
+      if (!programId || !date) {
+        throw new BadRequestException('Program ID and date are required.');
+      }
+      
+      let visits: Visit[] = [];
+
+      if (this.isMongoDB) {
+        // MongoDB Raw Query
+        const [startDate, endDate] = this.getDateRange(date);
+        
+        const matchStage = {
+          $match: {
+            "data.programId": programId,
+            "data.startDate": {
+              $gte: startDate.toISOString(),
+              $lt: endDate.toISOString(),
+            }
+          }
+        };
+
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'Visit',
+          pipeline: [
+            matchStage,
+            { $limit: 1000 } // Add a limit to prevent fetching too many records
+          ],
+          cursor: {}
+        });
+
+        visits = result?.cursor?.firstBatch?.map(this.deserializeData) || [];
+
+      } else {
+        // SQLite Raw Query
+        const startDate = `${date}T00:00:00.000Z`;
+        const endDate = `${date}T23:59:59.999Z`;
+
+        const query = `
+          SELECT * FROM visits
+          WHERE 
+            json_extract(data, '$.programId') = ? 
+            AND json_extract(data, '$.startDate') BETWEEN ? AND ?
+          ORDER BY "createdAt" DESC
+        `;
+        
+        visits = await (this.prisma as any).$queryRawUnsafe(
+          query,
+          programId,
+          startDate,
+          endDate
+        );
+      }
+      
+      return visits.map(visit => ({
+        ...this.deserializeData(visit.data)
+      }));
+
+    } catch (error) {
+      this.logger.error(`Failed to fetch visits: ${error.message}`, error.stack);
+      return [];
+    }
+  }
 
   // Create or update if exists
   async create(createVisitDto: CreateVisitDto): Promise<Visit> {
@@ -419,6 +490,15 @@ export class VisitService {
       this.logger.error(`Failed to delete multiple visits: ${error.message}`, error.stack);
       return { deletedCount: 0 };
     }
+  }
+
+  // Helper method to create date range
+  private getDateRange(dateString: string): [Date, Date] {
+    const startDate = new Date(dateString);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(dateString);
+    endDate.setHours(23, 59, 59, 999);
+    return [startDate, endDate];
   }
 
   // Helper methods for data serialization/deserialization

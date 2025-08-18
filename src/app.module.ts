@@ -39,6 +39,7 @@ import { StageService } from "./modules/stage/stage.service";
 import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { LiveAPIService } from "./app.liveAPIService";
+import { SharedModule } from "./modules/SharedModule/shared.module";
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { LiveAPIService } from "./app.liveAPIService";
     ServerPatientCountModule,
     VisitModule,
     StageModule,
+    SharedModule,
   ],
   controllers: [AppController],
   providers: [
@@ -94,6 +96,6 @@ import { LiveAPIService } from "./app.liveAPIService";
     ServerTimeService,
     LiveAPIService,
   ],
-  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService, LiveAPIService],
+  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService, VisitService, LiveAPIService],
 })
 export class AppModule {}
