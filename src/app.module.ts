@@ -40,6 +40,7 @@ import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { LiveAPIService } from "./app.liveAPIService";
 import { SharedModule } from "./modules/SharedModule/shared.module";
+import { unsavedVisitModule } from "./modules/unsavedVisits/visit.module";
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { SharedModule } from "./modules/SharedModule/shared.module";
     VisitModule,
     StageModule,
     SharedModule,
+    unsavedVisitModule,
   ],
   controllers: [AppController],
   providers: [

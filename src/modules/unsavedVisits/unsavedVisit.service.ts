@@ -123,6 +123,73 @@ export class UnsavedVisitsService {
         }
     }
 
+    async getUnsavedVisitByIdentifier(identifier: string): Promise<UnsavedVisit | null> {
+        try {
+            this.logger.log(`Fetching unsaved visit with data.identifier: ${identifier}`);
+        
+            if (!identifier) {
+                throw new BadRequestException('Identifier is required.');
+            }
+            
+            let unsavedVisit: UnsavedVisit | null = null;
+        
+            if (this.isMongoDB) {
+                // MongoDB Raw Query
+                const matchStage = {
+                    $match: {
+                        "data.identifier": identifier,
+                    }
+                };
+        
+                const result = await (this.prisma as any).$runCommandRaw({
+                    aggregate: 'unsaved_visits',
+                    pipeline: [
+                        matchStage
+                    ],
+                    cursor: {}
+                });
+
+                const firstBatch = result?.cursor?.firstBatch;
+                if (firstBatch && firstBatch.length > 0) {
+                    const doc = firstBatch[0];
+                    unsavedVisit = {
+                        ...doc,
+                        data: this.deserializeData(doc.data)
+                    };
+                }
+            } else {
+                // SQLite Raw Query
+                const query = `
+                    SELECT * FROM unsaved_visits
+                    WHERE 
+                    json_extract(data, '$.identifier') = ?
+                `;
+                
+                const results = await (this.prisma as any).$queryRawUnsafe(
+                    query,
+                    identifier
+                );
+
+                if (results.length > 0) {
+                    unsavedVisit = {
+                        ...results[0],
+                        data: this.deserializeData(results[0].data)
+                    };
+                }
+            }
+            
+            if (!unsavedVisit) {
+                this.logger.warn(`Unsaved visit with identifier ${identifier} not found.`);
+            }
+
+            return unsavedVisit;
+        
+        } catch (error) {
+            this.logger.error(`Failed to fetch unsaved visit by identifier ${identifier}: ${error.message}`, error.stack);
+            return null;
+        }
+    }
+
     private serializeData(data: any): any {
         if (data === null || data === undefined) return null;
 

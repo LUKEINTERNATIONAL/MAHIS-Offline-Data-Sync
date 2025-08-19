@@ -7,6 +7,7 @@ import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { ServerTimeService } from './app.serverTimeService';
 import { LiveAPIService } from './app.liveAPIService';
+import { UnsavedVisitsService } from './modules/unsavedVisits/unsavedVisit.service';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -28,6 +29,7 @@ export class AppController {
     private readonly stageService: StageService,
     private readonly serverTimeService: ServerTimeService,
     private readonly liveAPIService: LiveAPIService,
+    private readonly unsavedVisitsService: UnsavedVisitsService,
   ) {}
 
   @Get()
@@ -148,6 +150,34 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     
     const visits = await this.visitService.getActiveVisits(programId, patientId);
     return visits;
+  }
+
+  @Get('visits/by-data-id')
+  async getVisitByDataId(
+    @Query('id') id: string,
+  ): Promise<any> {
+    if (!id) {
+      throw new BadRequestException('The "id" query parameter is required.');
+    }
+
+    this.logger.log(`Fetching visit by data.id: ${id}`);
+    
+    const visit = await this.visitService.getVisitById(id);
+    return visit;
+  }
+
+    @Get('by-identifier')
+  async getUnsavedVisitByIdentifier(
+    @Query('identifier') identifier: string,
+  ): Promise<any> {
+    if (!identifier) {
+      throw new BadRequestException('The "identifier" query parameter is required.');
+    }
+
+    this.logger.log(`Fetching unsaved visit for identifier: ${identifier}`);
+    
+    const unsavedVisit = await this.unsavedVisitsService.getUnsavedVisitByIdentifier(identifier);
+    return unsavedVisit;
   }
 
   @Get('search')

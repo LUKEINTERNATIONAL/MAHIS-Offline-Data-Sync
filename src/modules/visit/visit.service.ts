@@ -556,6 +556,75 @@ async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
     }
   }
 
+  async getVisitById(id: string): Promise<Visit | null> {
+    try {
+      this.logger.log(`Fetching visit with data.id: ${id}`);
+  
+      if (!id) {
+        throw new BadRequestException('ID is required.');
+      }
+      
+      let visit: Visit | null = null;
+  
+      if (this.isMongoDB) {
+        // MongoDB Raw Query
+        const matchStage = {
+          $match: {
+            "data.id": id,
+          }
+        };
+
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'visits',
+          pipeline: [
+            matchStage,
+            { $limit: 1 }
+          ],
+          cursor: {}
+        });
+
+        const firstBatch = result?.cursor?.firstBatch;
+        if (firstBatch && firstBatch.length > 0) {
+          const doc = firstBatch[0];
+          visit = {
+            ...doc,
+            data: this.deserializeData(doc.data)
+          };
+        }
+      } else {
+        // SQLite Raw Query
+        const query = `
+          SELECT * FROM visits
+          WHERE 
+          json_extract(data, '$.id') = ?
+          LIMIT 1
+        `;
+        
+        const results = await (this.prisma as any).$queryRawUnsafe(
+          query,
+          id
+        );
+
+        if (results.length > 0) {
+          visit = {
+            ...results[0],
+            data: this.deserializeData(results[0].data)
+          };
+        }
+      }
+      
+      if (!visit) {
+        this.logger.warn(`Visit with id ${id} not found.`);
+      }
+
+      return visit;
+    
+    } catch (error) {
+      this.logger.error(`Failed to fetch visit by id ${id}: ${error.message}`, error.stack);
+      return null;
+    }
+  }
+
   // Helper method to create date range
   private getDateRange(dateString: string): [Date, Date] {
     const startDate = new Date(dateString);
