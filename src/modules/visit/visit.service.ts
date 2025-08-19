@@ -56,7 +56,7 @@ async getTodaysVisits(programId: string, date: string): Promise<Visit[]> {
         };
 
         const result = await (this.prisma as any).$runCommandRaw({
-          aggregate: 'Visit',
+          aggregate: 'visit',
           pipeline: [
             matchStage,
             { $limit: 1000 } // Add a limit to prevent fetching too many records
@@ -117,7 +117,7 @@ async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
       };
 
       const result = await (this.prisma as any).$runCommandRaw({
-        aggregate: 'Visit',
+        aggregate: 'visit',
         pipeline: [
           matchStage,
           { $limit: 1000 }
