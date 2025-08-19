@@ -1,5 +1,5 @@
 // app.controller.ts
-import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query, Logger } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
@@ -19,6 +19,7 @@ export class PayloadDto {
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
   constructor(
     private readonly appService: AppService,
     private readonly patientService: PatientService,
@@ -100,9 +101,39 @@ async getPatientPayload(@Param('patientId') patientId: string) {
   }
 
   @Get('todays-visits')
-  async getTodaysVisits() {
-    const visits = await this.visitService.getTodaysVisits('14', '2025-08-15');
-    return visits
+  @Get('todays-visits')
+  async getTodaysVisits(
+    @Query('programId') programId: string,
+    @Query('date') date?: string, // Make the date parameter optional
+  ) {
+    if (!programId) {
+      throw new BadRequestException('programId query parameter is required.');
+    }
+
+    let queryDate: string;
+
+    // Check if a date was provided in the query
+    if (date) {
+      // Use the provided date
+      queryDate = date;
+      this.logger.log(`Using provided date: ${queryDate}`);
+    } else {
+      // Fall back to the current server date
+      const serverTimeData = this.serverTimeService.getStoredServerTimeData();
+      if (!serverTimeData || !serverTimeData.date) {
+        throw new BadRequestException('Server date is not available.');
+      }
+      queryDate = serverTimeData.date;
+      this.logger.log(`Using server's local date: ${queryDate}`);
+    }
+
+    try {
+      const visits = await this.visitService.getTodaysVisits(programId, queryDate);
+      return visits;
+    } catch (error) {
+      this.logger.error(`Failed to fetch visits for programId: ${programId} on date: ${queryDate}`, error.stack);
+      throw error;
+    }
   }
 
   @Get('search')
