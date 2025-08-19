@@ -101,7 +101,6 @@ async getPatientPayload(@Param('patientId') patientId: string) {
   }
 
   @Get('todays-visits')
-  @Get('todays-visits')
   async getTodaysVisits(
     @Query('programId') programId: string,
     @Query('date') date?: string, // Make the date parameter optional
