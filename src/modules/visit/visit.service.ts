@@ -97,6 +97,70 @@ async getTodaysVisits(programId: string, date: string): Promise<Visit[]> {
     }
   }
 
+async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
+  try {
+    this.logger.log(`Fetching visits for programId: ${programId} and patientId: ${identifier}`);
+
+    if (!programId || !identifier) {
+      throw new BadRequestException('Program ID and Patient ID are required.');
+    }
+    
+    let visits: Visit[] = [];
+
+    if (this.isMongoDB) {
+      // MongoDB Raw Query
+      const matchStage = {
+        $match: {
+          "data.programId": programId,
+          "data.identifier": identifier,
+        }
+      };
+
+      const result = await (this.prisma as any).$runCommandRaw({
+        aggregate: 'Visit',
+        pipeline: [
+          matchStage,
+          { $limit: 1000 }
+        ],
+        cursor: {}
+      });
+
+      visits = result?.cursor?.firstBatch?.map(visit => ({
+        ...visit,
+        data: this.deserializeData(visit.data)
+      })) || [];
+
+    } else {
+      // SQLite Raw Query
+      const query = `
+        SELECT * FROM visits
+        WHERE 
+          json_extract(data, '$.programId') = ? 
+          AND json_extract(data, '$.identifier') = ?
+        ORDER BY "createdAt" DESC
+      `;
+      
+      visits = await (this.prisma as any).$queryRawUnsafe(
+        query,
+        programId,
+        identifier
+      );
+
+      // Deserialize data for each visit
+      visits = visits.map(visit => ({
+        ...visit,
+        data: this.deserializeData(visit.data)
+      }));
+    }
+    
+    return visits;
+
+  } catch (error) {
+    this.logger.error(`Failed to fetch visits for patient: ${identifier}: ${error.message}`, error.stack);
+    return [];
+  }
+}
+
   // Create or update if exists
   async create(createVisitDto: CreateVisitDto): Promise<Visit> {
     try {

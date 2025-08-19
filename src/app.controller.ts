@@ -135,6 +135,21 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     }
   }
 
+  @Get('visits/active')
+  async getActiveVisits(
+    @Query('programId') programId: string,
+    @Query('patientId') patientId: string,
+  ) {
+    if (!programId || !patientId) {
+      throw new BadRequestException('Both programId and patientId query parameters are required.');
+    }
+
+    this.logger.log(`Fetching active visits for program: ${programId} and patient: ${patientId}`);
+    
+    const visits = await this.visitService.getActiveVisits(programId, patientId);
+    return visits;
+  }
+
   @Get('search')
   async searchPatients(
     @Query('given_name') given_name?: string,

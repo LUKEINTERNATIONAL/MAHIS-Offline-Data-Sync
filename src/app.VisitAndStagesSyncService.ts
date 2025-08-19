@@ -80,7 +80,7 @@ export class VisitAndStagesSyncService {
 
             this.Stagelogger.log(`Syncing stages`);
 
-            const GET_STAGES_URL = `${this.authService.getBaseUrl()}/stages/active_stages`;
+            const GET_STAGES_URL = `${this.authService.getBaseUrl()}/stages`;
 
             const { data: responseData } = await lastValueFrom(
                 this.httpService.get(GET_STAGES_URL, {

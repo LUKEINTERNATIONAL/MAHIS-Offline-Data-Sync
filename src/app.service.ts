@@ -229,7 +229,7 @@ export class AppService {
   }
 
   async getPatientPayload(patientId: string) {
-    const patient = await this.patientService.findByPatientId(patientId);
+    const patient = await this.patientService.findPatientByIdentifier(patientId);
     if (!patient) {
       throw new NotFoundException(`Patient with ID ${patientId} not found`);
     }

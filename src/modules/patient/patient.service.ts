@@ -36,6 +36,11 @@ interface DuplicateMatchResult {
   potentialMatches: Array<{ patient: Patient; score: number }>;
 }
 
+interface NestedSearchParams {
+  id?: string;
+  patientId?: string;
+}
+
 /**
  * Recursively converts BigInt values within an object or array to strings.
  * This is necessary because JSON.stringify cannot serialize BigInts directly.
@@ -383,6 +388,71 @@ export class PatientService {
     
     return patient ? this.parsePatientData(patient) : null;
   }
+
+async findPatientByIdentifier(patientId: string): Promise<Patient | null> {
+    this.logger.log(`Searching for patient with patientId: ${patientId}`);
+
+    if (!patientId) {
+        this.logger.warn('No patientId provided for search');
+        return null;
+    }
+
+    let patient: any;
+    const isMongoDB = process.env.DATABASE_PROVIDER === 'mongodb';
+
+    try {
+        if (isMongoDB) {
+            // MongoDB uses an aggregation pipeline to perform the search on nested fields.
+            const pipeline = [
+                {
+                    $match: {
+                        $or: [
+                            { "data.ID": patientId },
+                            { "data.patientID": parseInt(patientId, 10) }
+                        ]
+                    }
+                },
+                { $limit: 1 }
+            ];
+
+            const result = await (this.prisma as any).$runCommandRaw({
+                aggregate: 'Patient',
+                pipeline: pipeline,
+                cursor: {}
+            });
+
+            patient = result?.cursor?.firstBatch?.[0];
+
+        } else {
+            // This path handles all other database types, including SQLite.
+            const query = `
+                SELECT * FROM Patient
+                WHERE json_extract(data, '$.ID') = ? OR json_extract(data, '$.patientID') = ?
+                LIMIT 1
+            `;
+
+            const result = await (this.prisma as any).$queryRawUnsafe(
+                query,
+                patientId,
+                parseInt(patientId, 10)
+            );
+
+            patient = result?.[0];
+        }
+    } catch (error) {
+        this.logger.error(`Error searching for patient with identifier ${patientId}: ${error.message}`, error.stack);
+        // Fallback to in-memory search in case the raw query fails
+        const allPatients = await this.prisma.patient.findMany();
+        patient = allPatients.find(p => {
+            const parsed = JSON.parse(p.data as string) as any;
+            const matchId = patientId && parsed?.ID === patientId;
+            const matchPatientId = patientId && String(parsed?.patientID) === patientId;
+            return matchId || matchPatientId;
+        });
+    }
+
+    return patient ? this.parsePatientData(patient) : null;
+}
 
   async updateById(id: string, data: Partial<Patient>): Promise<Patient | null> {
     try {
