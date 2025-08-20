@@ -678,4 +678,61 @@ async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
     
     return { visit_id: 'asc' }; // Default sort
   }
+
+  async deleteVisitByIdentifier(identifier: string): Promise<any> {
+    try {
+        this.logger.log(`Attempting to delete uvisit with data.identifier: ${identifier}`);
+
+        if (!identifier) {
+            throw new BadRequestException('Identifier is required.');
+        }
+
+        let deletionResult: any;
+
+        if (this.isMongoDB) {
+            // MongoDB Raw Query for deletion
+            // Using a simple deleteOne or deleteMany
+            const result = await (this.prisma as any).$runCommandRaw({
+                delete: "visits",
+                deletes: [
+                    {
+                        q: {
+                            "data.identifier": identifier
+                        },
+                        limit: 1 // To delete only one record
+                    }
+                ],
+                ordered: true
+            });
+            deletionResult = result.n; // number of deleted documents
+
+        } else {
+            // SQLite Raw Query for deletion
+            const query = `
+                DELETE FROM visits
+                WHERE 
+                json_extract(data, '$.identifier') = ?
+            `;
+            
+            const results = await (this.prisma as any).$executeRawUnsafe(
+                query,
+                identifier
+            );
+            
+            deletionResult = results; // number of deleted rows
+        }
+
+        if (deletionResult === 0) {
+            this.logger.warn(`visit with identifier ${identifier} not found. No records deleted.`);
+        } else {
+            this.logger.log(`Successfully deleted ${deletionResult} record(s) with identifier ${identifier}.`);
+        }
+
+        return deletionResult > 0; // Return true if at least one record was deleted
+
+    } catch (error) {
+        this.logger.error(`Failed to delete visit by identifier ${identifier}: ${error.message}`, error.stack);
+        return false;
+    }
+  }
 }

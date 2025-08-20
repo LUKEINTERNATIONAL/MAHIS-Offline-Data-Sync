@@ -7,7 +7,7 @@ import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { ServerTimeService } from './app.serverTimeService';
 import { LiveAPIService } from './app.liveAPIService';
-import { UnsavedVisitsService } from './modules/unsavedVisits/unsavedVisit.service';
+import { CreateUnsavedVisitDto, UnsavedVisitsService } from './modules/unsavedVisits/unsavedVisit.service';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -179,6 +179,19 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     const unsavedVisit = await this.unsavedVisitsService.getUnsavedVisitByIdentifier(identifier);
     return unsavedVisit;
   }
+
+  @Post('unsaved-visits/create')
+  async createUnsavedVisit(@Body() createUnsavedVisitDto: CreateUnsavedVisitDto) {
+    this.logger.log('Creating new unsaved visit');
+
+    try {
+      const createdVisit = await this.unsavedVisitsService.create(createUnsavedVisitDto);
+      return createdVisit;
+    } catch (error) {
+      this.logger.error(`Error creating unsaved visit: ${error.message}`, error.stack);
+    }
+  }
+
   @Delete('stages/deleteByStageId') // No :stageId in the path
   async deleteStageById(@Query('stageId') stageId: number) {
     if (!stageId) {

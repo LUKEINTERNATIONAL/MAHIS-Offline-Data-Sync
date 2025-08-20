@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -21,6 +21,7 @@ export interface StageQueryOptions {
 @Injectable()
 export class StageService {
   private readonly logger = new Logger(StageService.name);
+  private readonly isMongoDB: boolean;
 
   constructor(private prisma: PrismaService) {}
 
@@ -502,5 +503,62 @@ export class StageService {
     }
     
     return { stage_id: 'asc' }; // Default sort
+  }
+
+  async deleteStageByIdentifier(identifier: string): Promise<any> {
+    try {
+      this.logger.log(`Attempting to delete stage with data.identifier: ${identifier}`);
+
+      if (!identifier) {
+        throw new BadRequestException('Identifier is required.');
+      }
+
+      let deletionResult: any;
+
+      if (this.isMongoDB) {
+        // MongoDB Raw Query for deletion
+        // Using a simple deleteOne or deleteMany
+        const result = await (this.prisma as any).$runCommandRaw({
+          delete: "stages",
+          deletes: [
+            {
+              q: {
+                "data.identifier": identifier
+              },
+              limit: 1 // To delete only one record
+            }
+          ],
+          ordered: true
+        });
+        deletionResult = result.n; // number of deleted documents
+
+      } else {
+        // SQLite Raw Query for deletion
+        const query = `
+          DELETE FROM stages
+          WHERE 
+          json_extract(data, '$.identifier') = ?
+        `;
+        
+        const results = await (this.prisma as any).$executeRawUnsafe(
+          query,
+          identifier
+        );
+        
+        deletionResult = results; // number of deleted rows
+      }
+
+      if (deletionResult === 0) {
+        this.logger.warn(`Stage with identifier ${identifier} not found. No records deleted.`);
+      } else {
+        this.logger.log(`Successfully deleted ${deletionResult} record(s) with identifier ${identifier}.`);
+      }
+
+      return deletionResult > 0; // Return true if at least one record was deleted
+
+    } catch (error) {
+      this.logger.error(`Failed to delete stage by identifier ${identifier}: ${error.message}`, error.stack);
+      return false;
+    }
   }
 }

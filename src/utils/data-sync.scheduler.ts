@@ -11,6 +11,7 @@ import { VisitAndStagesSyncService } from './../app.VisitAndStagesSyncService';
 import { UserService } from '../modules/user/user.service';
 import { ServerPatientCountService } from '../modules/serverPatientCount/server-patient-count.service';
 import { ServerTimeService } from './../app.serverTimeService';
+import { UnsavedVisitsService } from '../modules/unsavedVisits/unsavedVisit.service';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -29,6 +30,7 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly userService: UserService,
     private readonly serverPatientCountService: ServerPatientCountService,
     private readonly serverTimeService: ServerTimeService,
+    private readonly unsavedVisitsService: UnsavedVisitsService
   ) {
     // Get configuration from environment variables with defaults
     this.isEnabled = this.configService.get<string>('SYNC_SCHEDULER_ENABLED') !== 'false';
@@ -92,9 +94,11 @@ async checkPatientCountChanges() {
         this.ddeService
       )
     );
-    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
-    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
-    await this.serverTimeService.getServerTimeAndDate();
+    // await this.unsavedVisitsService.syncUnsavedVisits();
+    await this.unsavedVisitsService.syncPendingUpdateVisits();
+    // await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    // await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    // await this.serverTimeService.getServerTimeAndDate();
 
   } catch (error) {
     this.logger.error(`Patient count check failed: ${error.message}`);
@@ -105,24 +109,24 @@ async checkPatientCountChanges() {
    * Perform the actual patient record sync operation
    */
   private async syncPatientRecords() {
-    await this.DDE4Service.getDDEIDSViaExternalAPI();
-    await fetchAndSaveUserData(
-        this.authService,
-        this.userService,
-        this.httpService,
-        this.logger,
-    );
-    await this.dataSyncService.syncPatientRecords();
-    await syncPatientIds(
-        this.authService,
-        this.httpService,
-        this.logger,
-        this.patientService,
-        this.ddeService
-      );
-    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
-    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
-    await this.serverTimeService.getServerTimeAndDate();
+    // await this.DDE4Service.getDDEIDSViaExternalAPI();
+    // await fetchAndSaveUserData(
+    //     this.authService,
+    //     this.userService,
+    //     this.httpService,
+    //     this.logger,
+    // );
+    // await this.dataSyncService.syncPatientRecords();
+    // await syncPatientIds(
+    //     this.authService,
+    //     this.httpService,
+    //     this.logger,
+    //     this.patientService,
+    //     this.ddeService
+    //   );
+    // await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    // await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    // await this.serverTimeService.getServerTimeAndDate();
   }
 
   /**
