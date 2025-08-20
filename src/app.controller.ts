@@ -1,5 +1,5 @@
 // app.controller.ts
-import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query, Logger, Delete } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
@@ -166,7 +166,7 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     return visit;
   }
 
-    @Get('by-identifier')
+  @Get('unsaved-visits/by-identifier')
   async getUnsavedVisitByIdentifier(
     @Query('identifier') identifier: string,
   ): Promise<any> {
@@ -178,6 +178,15 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     
     const unsavedVisit = await this.unsavedVisitsService.getUnsavedVisitByIdentifier(identifier);
     return unsavedVisit;
+  }
+  @Delete('stages/deleteByStageId') // No :stageId in the path
+  async deleteStageById(@Query('stageId') stageId: number) {
+    if (!stageId) {
+      throw new BadRequestException('The "stageId" query parameter is required.');
+    }
+    this.logger.log(`Deleting stage with ID: ${stageId}`);
+    const deletedStage = await this.stageService.deleteByStageId(stageId);
+    return deletedStage; // Return the deleted stage or a success message
   }
 
   @Get('search')

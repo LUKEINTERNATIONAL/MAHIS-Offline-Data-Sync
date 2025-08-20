@@ -69,8 +69,7 @@ export class UnsavedVisitsService {
     
           // Deserialize data for each visit
           unsavedVisits = unsavedVisits.map(unsaved_visit => ({
-            ...unsaved_visit,
-            data: this.deserializeData(unsaved_visit.data)
+             ...this.deserializeData(unsaved_visit.data)
           }));
         }
         
@@ -94,8 +93,7 @@ export class UnsavedVisitsService {
             });
 
             return {
-                ...createdVisit,
-                data: this.deserializeData(createdVisit.data)
+                 ...this.deserializeData(createdVisit.data)
             };
         } catch (error) {
             this.logger.error(`Failed to create unsaved visit: ${error.message}`, error.stack);
@@ -153,8 +151,7 @@ export class UnsavedVisitsService {
                 if (firstBatch && firstBatch.length > 0) {
                     const doc = firstBatch[0];
                     unsavedVisit = {
-                        ...doc,
-                        data: this.deserializeData(doc.data)
+                         ...this.deserializeData(doc.data)
                     };
                 }
             } else {
@@ -172,8 +169,7 @@ export class UnsavedVisitsService {
 
                 if (results.length > 0) {
                     unsavedVisit = {
-                        ...results[0],
-                        data: this.deserializeData(results[0].data)
+                         ...this.deserializeData(results[0].data)
                     };
                 }
             }

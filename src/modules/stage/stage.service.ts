@@ -96,8 +96,7 @@ export class StageService {
       }
 
       return {
-        ...stage,
-        data: this.deserializeData(stage.data)
+        ...this.deserializeData(stage.data)
       };
     } catch (error) {
       this.logger.error(`Failed to find stage by ID ${id}: ${error.message}`, error.stack);
@@ -118,8 +117,7 @@ export class StageService {
       }
 
       return {
-        ...stage,
-        data: this.deserializeData(stage.data)
+        ...this.deserializeData(stage.data)
       };
     } catch (error) {
       this.logger.error(`Failed to find stage by stage_id ${stageId}: ${error.message}`, error.stack);
@@ -142,8 +140,7 @@ export class StageService {
         if (existingStage) {
           this.logger.warn(`Stage with stage_id ${updateStageDto.stage_id} already exists, skipping update`);
           return {
-            ...existingStage,
-            data: this.deserializeData(existingStage.data)
+            ...this.deserializeData(existingStage.data)
           };
         }
       }
@@ -162,8 +159,7 @@ export class StageService {
       });
 
       return {
-        ...updatedStage,
-        data: this.deserializeData(updatedStage.data)
+        ...this.deserializeData(updatedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -187,8 +183,7 @@ export class StageService {
         if (existingStage) {
           this.logger.warn(`Stage with stage_id ${updateStageDto.stage_id} already exists, skipping update`);
           return {
-            ...existingStage,
-            data: this.deserializeData(existingStage.data)
+            ...this.deserializeData(existingStage.data)
           };
         }
       }
@@ -207,8 +202,7 @@ export class StageService {
       });
 
       return {
-        ...updatedStage,
-        data: this.deserializeData(updatedStage.data)
+         ...this.deserializeData(updatedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -228,8 +222,7 @@ export class StageService {
       });
 
       return {
-        ...deletedStage,
-        data: this.deserializeData(deletedStage.data)
+        ...this.deserializeData(deletedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -249,8 +242,7 @@ export class StageService {
       });
 
       return {
-        ...deletedStage,
-        data: this.deserializeData(deletedStage.data)
+        ...this.deserializeData(deletedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found

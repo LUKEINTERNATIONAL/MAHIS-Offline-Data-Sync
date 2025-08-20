@@ -126,8 +126,7 @@ async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
       });
 
       visits = result?.cursor?.firstBatch?.map(visit => ({
-        ...visit,
-        data: this.deserializeData(visit.data)
+         ...this.deserializeData(visit.data)
       })) || [];
 
     } else {
@@ -148,8 +147,7 @@ async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
 
       // Deserialize data for each visit
       visits = visits.map(visit => ({
-        ...visit,
-        data: this.deserializeData(visit.data)
+        ...this.deserializeData(visit.data)
       }));
     }
     
@@ -258,8 +256,7 @@ async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
       }
       
       return {
-        ...visit,
-        data: this.deserializeData(visit.data)
+         ...this.deserializeData(visit.data)
       };
     } catch (error) {
       this.logger.error(`Failed to find visit by visit_id ${visitId}: ${error.message}`, error.stack);
