@@ -189,6 +189,20 @@ async getPatientPayload(@Param('patientId') patientId: string) {
     return deletedStage; // Return the deleted stage or a success message
   }
 
+  @Delete('stages/deleteByIdentifier/:identifier')
+  async deleteByIdentifier(@Param('identifier') identifier: string) {
+    if (!identifier) {
+      throw new BadRequestException('The "identifier" path parameter is required.');
+    }
+    
+    this.logger.log(`Deleting stage with identifier: ${identifier}`);
+    
+    // Call the new service method that handles nested data deletion
+    const deletedStage = await this.stageService.deleteByDataIdentifier(identifier);
+    
+    return deletedStage;
+  }
+
   @Get('search')
   async searchPatients(
     @Query('given_name') given_name?: string,

@@ -395,6 +395,55 @@ export class StageService {
     }
   }
 
+  async deleteByDataIdentifier(identifier: string) {
+    this.logger.log(`Attempting to delete stage with data.identifier: ${identifier}`);
+
+    try {
+      // Check the database provider to use the correct query
+      if (process.env.DATABASE_PROVIDER.toString() === 'mongodb') {
+        const query = { 'data.identifier': identifier };
+        const result = await (this.prisma as any).stage.deleteMany({
+          where: query,
+        });
+        
+        // deleteMany returns a count, so we need to fetch the deleted data if needed
+        if (result.count > 0) {
+            this.logger.log(`Successfully deleted ${result.count} stage(s) with data.identifier: ${identifier}`);
+            // Note: Prisma's deleteMany doesn't return the deleted records.
+            // You might want to return the count or a success message.
+            return { deletedCount: result.count };
+        }
+
+      } else if (process.env.DATABASE_PROVIDER.toString() === 'sqlite') {
+        const query = Prisma.sql`
+          DELETE FROM "stages"
+          WHERE json_extract(data, '$.identifier') = ${identifier}
+          RETURNING *;
+        `;
+        const result = await (this.prisma as any).$queryRaw(query);
+
+        if (result && result.length > 0) {
+            this.logger.log(`Successfully deleted ${result.length} stage(s) with data.identifier: ${identifier}`);
+            // Return the first deleted item as an example
+            const stage = result[0];
+            return {
+                ...this.deserializeData(stage.data)
+            };
+        }
+      } else {
+        // Fallback for an unknown database provider
+        this.logger.warn('Unknown DATABASE_PROVIDER. Deletion by data.identifier not supported.');
+        return null;
+      }
+
+      this.logger.warn(`No stage found with data.identifier: ${identifier} for deletion`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to delete stage with data.identifier ${identifier}: ${error.message}`, error.stack);
+      return null;
+    }
+  }
+
   async deleteMany(stageIds: number[]): Promise<{ deletedCount: number }> {
     try {
       const result = await this.prisma.stage.deleteMany({
