@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UnsavedVisit, Prisma } from '@prisma/client';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
-import { AuthService} from '../SharedModule/shared.module';
+import { AuthService } from '../SharedModule/shared.module';
 import { VisitService } from '../visit/visit.service';
 import { StageService } from '../stage/stage.service';
 

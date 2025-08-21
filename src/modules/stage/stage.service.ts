@@ -1,6 +1,9 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { AuthService } from '../SharedModule/shared.module';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 
 export interface CreateStageDto {
   stage_id: number; // Changed from 'id' to match Prisma schema
@@ -23,7 +26,11 @@ export class StageService {
   private readonly logger = new Logger(StageService.name);
   private readonly isMongoDB: boolean;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly authService: AuthService,
+    private readonly httpService: HttpService,
+  ) {}
 
   // Create a new stage or update if exists
   async create(createStageDto: CreateStageDto) {
@@ -593,4 +600,113 @@ export class StageService {
       return false;
     }
   }
+
+      async syncUnsavedStages(): Promise<void> {
+        this.logger.log('Starting synchronization of unsaved stages with sync_status: pending');
+
+        try {
+            let pendingStages: any[];
+
+            if (this.isMongoDB) {
+                // MongoDB Raw Query for filtering by a nested field
+                const matchStage = {
+                    $match: {
+                        "data.sync_status": "pending"
+                    }
+                };
+                const result = await (this.prisma as any).$runCommandRaw({
+                    aggregate: 'stages',
+                    pipeline: [matchStage],
+                    cursor: {}
+                });
+
+                pendingStages = result?.cursor?.firstBatch?.map(stage => ({
+                    ...stage,
+                    data: this.deserializeData(stage.data)
+                })) || [];
+
+            } else {
+                // SQLite Raw Query for filtering by a nested field
+                const query = `
+                    SELECT * FROM stages
+                    WHERE json_extract(data, '$.sync_status') = 'pending'
+                `;
+                pendingStages = await (this.prisma as any).$queryRawUnsafe(query);
+
+                pendingStages = pendingStages.map(stage => ({
+                    ...stage,
+                    data: this.deserializeData(stage.data)
+                }));
+            }
+
+            if (pendingStages.length === 0) {
+                this.logger.log('No pending unsaved stages found to sync.');
+                return;
+            }
+
+            this.logger.log(`Found ${pendingStages.length} stages with a pending sync status. Syncing each...`);
+
+            // Use Promise.all to concurrently process each pending stage
+            const syncPromises = pendingStages.map(async (stage) => {
+                try {
+                    // Call the external API for each pending stage
+                    const apiResponse = await this.saveUnsavedStageViaExternalAPI(stage.data);
+                    
+                    if (apiResponse && apiResponse.success) {
+                        this.logger.log(`Successfully synced stage ID: ${stage.id}`);
+                        // Optionally, you could update the sync_status to 'synced' here
+                        // e.g., await this.updateById(stage.id, { data: { ...stage.data, sync_status: 'synced' } });
+                    } else {
+                        this.logger.warn(`Failed to sync stage ID: ${stage.id}. API response was not successful.`);
+                    }
+                } catch (apiError) {
+                    this.logger.error(`Error during sync for stage ID: ${stage.id}: ${apiError}`);
+                }
+            });
+
+            // Wait for all sync operations to complete
+            await Promise.all(syncPromises);
+
+            this.logger.log('Completed synchronization of all pending stages.');
+
+        } catch (error) {
+            this.logger.error(`Error during stage synchronization: ${error.message}`, error);
+        }
+    }
+
+        async saveUnsavedStageViaExternalAPI(data: any): Promise<any> {
+    
+            const isAuthenticated = await this.authService.ensureAuthenticated();
+            if (!isAuthenticated) {
+                this.logger.error("Failed to authenticate")
+            }
+    
+            if (!data) {
+                throw new Error('Sync payload is required');
+            }
+
+            delete data.id;
+    
+            const saveUrl = `${this.authService.getBaseUrl()}/stages`;
+    
+            const { data: responseData } = await lastValueFrom(
+                this.httpService.post(saveUrl, data, {
+                    headers: {
+                    Authorization: this.authService.getAuthToken(),
+                    'Content-Type': 'application/json',
+                    },
+                    timeout: 30000, // 30 second timeout
+                })
+            );
+    
+            if (responseData) {
+                console.log(JSON.stringify(responseData));
+                // await this.deleteUnsavedVisitByIdentifier(responseData.visit.identifier);
+                // await this.visitService.create({"visit_id": responseData.visit.id, "data": responseData.visit});
+    
+            return { success: true, responseData };
+            }
+    
+            return { success: false, error: 'No response data received' };
+        }
 }

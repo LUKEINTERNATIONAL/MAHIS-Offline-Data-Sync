@@ -13,6 +13,7 @@ import { UserService } from '../modules/user/user.service';
 import { ServerPatientCountService } from '../modules/serverPatientCount/server-patient-count.service';
 import { ServerTimeService } from './../app.serverTimeService';
 import { UnsavedVisitsService } from '../modules/unsavedVisits/unsavedVisit.service';
+import { StageService } from '../modules/stage/stage.service';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -31,7 +32,8 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly userService: UserService,
     private readonly serverPatientCountService: ServerPatientCountService,
     private readonly serverTimeService: ServerTimeService,
-    private readonly unsavedVisitsService: UnsavedVisitsService
+    private readonly unsavedVisitsService: UnsavedVisitsService,
+    private readonly stageService: StageService,
   ) {
     // Get configuration from environment variables with defaults
     this.isEnabled = this.configService.get<string>('SYNC_SCHEDULER_ENABLED') !== 'false';
@@ -97,6 +99,7 @@ async checkPatientCountChanges() {
     );
     await this.unsavedVisitsService.syncUnsavedVisits();
     await this.unsavedVisitsService.syncPendingUpdateVisits();
+    await this.stageService.syncUnsavedStages();
     await this.visitAndStagesSyncService.getStagesViaExternalAPI();
     await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
     await this.serverTimeService.getServerTimeAndDate();
