@@ -416,7 +416,7 @@ async findPatientByIdentifier(patientId: string): Promise<Patient | null> {
             ];
 
             const result = await (this.prisma as any).$runCommandRaw({
-                aggregate: 'Patient',
+                aggregate: 'patients',
                 pipeline: pipeline,
                 cursor: {}
             });
@@ -426,7 +426,7 @@ async findPatientByIdentifier(patientId: string): Promise<Patient | null> {
         } else {
             // This path handles all other database types, including SQLite.
             const query = `
-                SELECT * FROM Patient
+                SELECT * FROM patients
                 WHERE json_extract(data, '$.ID') = ? OR json_extract(data, '$.patientID') = ?
                 LIMIT 1
             `;

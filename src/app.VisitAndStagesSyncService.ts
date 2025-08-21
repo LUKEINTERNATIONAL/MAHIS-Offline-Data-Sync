@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { AuthService } from './app.authService';
+import { AuthService } from "./modules/SharedModule/shared.module";
 import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { lastValueFrom } from "rxjs";

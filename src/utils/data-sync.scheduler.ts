@@ -2,7 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { DataSyncService } from './../app.dataSyncService';
-import { AuthService, fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges } from './../app.authService';
+import { fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges } from './../app.authService';
+import { AuthService } from "../modules/SharedModule/shared.module";
 import { HttpService } from '@nestjs/axios';
 import { PatientService } from '../modules/patient/patient.service';
 import { DDE4DataSyncService } from './../app.dde4dataSyncService';
@@ -94,11 +95,11 @@ async checkPatientCountChanges() {
         this.ddeService
       )
     );
-    // await this.unsavedVisitsService.syncUnsavedVisits();
+    await this.unsavedVisitsService.syncUnsavedVisits();
     await this.unsavedVisitsService.syncPendingUpdateVisits();
-    // await this.visitAndStagesSyncService.getStagesViaExternalAPI();
-    // await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
-    // await this.serverTimeService.getServerTimeAndDate();
+    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    await this.serverTimeService.getServerTimeAndDate();
 
   } catch (error) {
     this.logger.error(`Patient count check failed: ${error.message}`);
@@ -109,24 +110,24 @@ async checkPatientCountChanges() {
    * Perform the actual patient record sync operation
    */
   private async syncPatientRecords() {
-    // await this.DDE4Service.getDDEIDSViaExternalAPI();
-    // await fetchAndSaveUserData(
-    //     this.authService,
-    //     this.userService,
-    //     this.httpService,
-    //     this.logger,
-    // );
-    // await this.dataSyncService.syncPatientRecords();
-    // await syncPatientIds(
-    //     this.authService,
-    //     this.httpService,
-    //     this.logger,
-    //     this.patientService,
-    //     this.ddeService
-    //   );
-    // await this.visitAndStagesSyncService.getStagesViaExternalAPI();
-    // await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
-    // await this.serverTimeService.getServerTimeAndDate();
+    await this.DDE4Service.getDDEIDSViaExternalAPI();
+    await fetchAndSaveUserData(
+        this.authService,
+        this.userService,
+        this.httpService,
+        this.logger,
+    );
+    await this.dataSyncService.syncPatientRecords();
+    await syncPatientIds(
+        this.authService,
+        this.httpService,
+        this.logger,
+        this.patientService,
+        this.ddeService
+      );
+    await this.visitAndStagesSyncService.getStagesViaExternalAPI();
+    await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
+    await this.serverTimeService.getServerTimeAndDate();
   }
 
   /**

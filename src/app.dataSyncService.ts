@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { PatientService } from './modules/patient/patient.service';
-import { AuthService } from './app.authService';
+import { AuthService } from "./modules/SharedModule/shared.module";
 import { lastValueFrom } from 'rxjs';
 import { SyncGateway } from './websocket/gateways/sync.gateway';
 import { DDEService } from './modules/dde/ddde.service';

@@ -7,7 +7,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { DataSyncService } from "./app.dataSyncService";
 import { DataSyncScheduler } from "./utils/data-sync.scheduler";
-import { AuthService } from "./app.authService";
+import { AuthService } from "./modules/SharedModule/shared.module";
 import { SyncGateway } from "./websocket/gateways/sync.gateway";
 import { ConceptNameModule } from "./modules/conceptName/concept-name.module";
 import { WardModule } from "./modules/wards/ward.module";

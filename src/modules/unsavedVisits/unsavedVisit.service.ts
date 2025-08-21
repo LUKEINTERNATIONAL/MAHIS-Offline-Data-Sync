@@ -457,6 +457,7 @@ export class UnsavedVisitsService {
         );
 
         if (responseData) {
+            console.log(JSON.stringify(responseData));
             await this.deleteUnsavedVisitByIdentifier(responseData.visit.identifier);
             await this.visitService.deleteVisitByIdentifier(responseData.visit.identifier);
             await this.stageService.deleteStageByIdentifier(responseData.visit.identifier);

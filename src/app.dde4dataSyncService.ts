@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { AuthService } from './app.authService';
+import { AuthService } from "./modules/SharedModule/shared.module";
 import { DDEService } from './modules/dde/ddde.service';
 import { lastValueFrom } from "rxjs";
 
