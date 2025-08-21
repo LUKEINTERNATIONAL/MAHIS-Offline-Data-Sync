@@ -92,14 +92,46 @@ async getPatientPayload(@Param('patientId') patientId: string) {
 
   @Get('visits')
   async getVisits() {
-    const visits = await this.visitService.findAll();
-    return visits.map(visit => visit.data);
+      const visits = await this.visitService.findAll();
+      const unsavedVisits = await this.unsavedVisitsService.findAll();
+      
+      this.logger.log(`Fetched ${visits.length} visits and ${unsavedVisits.length} unsaved visits`);
+
+      // Use the spread operator to combine the arrays
+      const mergedVisits = [...visits, ...unsavedVisits];
+
+      // Map over the merged array to return the 'data' property
+      return mergedVisits.map(visit => visit.data);
   }
 
   @Get('stages')
   async getStages() {
     const stages = await this.stageService.findAll();
     return stages.map(stage => stage.data);
+  }
+
+  @Post('stages/create')
+  async createStage(@Body() stageData: any) {
+    this.logger.log('Creating new stage with data:', stageData);
+    try {
+      const createdStage = await this.stageService.createBus(stageData);
+      return createdStage;
+    } catch (error) {
+      this.logger.error(`Error creating stage: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create stage');
+    }
+  }
+
+  @Post('visits/create')
+  async createVisit(@Body() visitData: any) {
+    this.logger.log('Creating new visit with data:', visitData);
+    try {
+      const createdVisit = await this.unsavedVisitsService.createBus(visitData);
+      return createdVisit;
+    } catch (error) {
+      this.logger.error(`Error creating visit: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create visit');
+    }
   }
 
   @Get('todays-visits')
@@ -130,7 +162,9 @@ async getPatientPayload(@Param('patientId') patientId: string) {
 
     try {
       const visits = await this.visitService.getTodaysVisits(programId, queryDate);
-      return visits;
+      const unsavedVisits = await this.unsavedVisitsService.getTodaysVisits(programId, queryDate);
+      this.logger.log(`Fetched ${visits.length} visits and ${unsavedVisits.length} unsaved visits for programId: ${programId} on date: ${queryDate}`);
+      return [...visits, ...unsavedVisits];
     } catch (error) {
       this.logger.error(`Failed to fetch visits for programId: ${programId} on date: ${queryDate}`, error.stack);
       throw error;
@@ -139,8 +173,8 @@ async getPatientPayload(@Param('patientId') patientId: string) {
 
   @Get('visits/active')
   async getActiveVisits(
-    @Query('programId') programId: string,
-    @Query('patientId') patientId: string,
+    @Query('programId') programId: any,
+    @Query('patientId') patientId: any,
   ) {
     if (!programId || !patientId) {
       throw new BadRequestException('Both programId and patientId query parameters are required.');

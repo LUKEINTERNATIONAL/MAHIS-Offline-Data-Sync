@@ -97,7 +97,7 @@ async getTodaysVisits(programId: string, date: string): Promise<Visit[]> {
     }
   }
 
-async getActiveVisits(programId: string, identifier: string): Promise<Visit[]> {
+async getActiveVisits(programId: any, identifier: any): Promise<Visit[]> {
   try {
     this.logger.log(`Fetching visits for programId: ${programId} and patientId: ${identifier}`);
 

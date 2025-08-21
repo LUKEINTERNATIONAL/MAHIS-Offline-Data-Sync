@@ -53,6 +53,38 @@ export class StageService {
     }
   }
 
+  async createBus(data: any): Promise<any | null> {
+    try {
+        // Generate a positive number that fits within a standard INT column
+        const min = 1; // Smallest positive integer
+        const max = 2147483647; // Maximum value for a signed 32-bit INT
+        const stage_id = Math.floor(Math.random() * (max - min + 1)) + min;
+
+        // 2. Create the DTO with the generated ID and provided data
+        data.id = JSON.stringify(stage_id)
+        const newStageDto: CreateStageDto = {
+            stage_id,
+            data
+        };
+
+        this.deleteByDataIdentifier(data.identifier); // Ensure no duplicates by identifier
+
+        // 3. Call the existing create method to save the new stage
+        const createdStage = await this.create(newStageDto);
+
+        if (createdStage) {
+            this.logger.log(`Successfully created stage with stage_id: ${createdStage.stage_id}`);
+        } else {
+            this.logger.error(`Failed to create stage with generated stage_id: ${stage_id}`);
+        }
+
+        return createdStage;
+    } catch (error) {
+        this.logger.error(`Failed to execute createBus: ${error.message}`, error.stack);
+        return null;
+    }
+}
+
   // Find all stages with optional query options
   async findAll(options?: StageQueryOptions) {
     try {

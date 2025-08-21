@@ -12,10 +12,42 @@ export interface CreateUnsavedVisitDto {
   data?: any;
 }
 
+export interface VisitQueryOptions {
+  limit?: number;
+  skip?: number;
+  sort?: any;
+}
+
 @Injectable()
 export class UnsavedVisitsService {
     private readonly logger = new Logger(UnsavedVisitsService.name);
     private readonly isMongoDB: boolean;
+
+    private getDateRange(dateString: string): [Date, Date] {
+        const startDate = new Date(dateString);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(dateString);
+        endDate.setHours(23, 59, 59, 999);
+        return [startDate, endDate];
+    }
+
+    private convertSortToPrisma(sort: any): Prisma.VisitOrderByWithRelationInput {
+        if (typeof sort === 'string') {
+        const field = sort.startsWith('-') ? sort.substring(1) : sort;
+        const direction = sort.startsWith('-') ? 'desc' : 'asc';
+        return { [field]: direction };
+        }
+        
+        if (typeof sort === 'object') {
+        const orderBy: Prisma.VisitOrderByWithRelationInput = {};
+        for (const [field, direction] of Object.entries(sort)) {
+            orderBy[field] = direction === -1 || direction === 'desc' ? 'desc' : 'asc';
+        }
+        return orderBy;
+        }
+        
+        return { visit_id: 'asc' }; // Default sort
+    }
 
     constructor(
         private readonly prisma: PrismaService,
@@ -26,6 +58,72 @@ export class UnsavedVisitsService {
     ) {
     this.isMongoDB = process.env.DATABASE_PROVIDER === 'mongodb';
     }
+
+    async getTodaysVisits(programId: string, date: string): Promise<any[]> {
+        try {
+          this.logger.log(`Fetching visits for programId: ${programId} on date: ${date}`);
+    
+          if (!programId || !date) {
+            throw new BadRequestException('Program ID and date are required.');
+          }
+          
+          let visits: any[] = [];
+    
+          if (this.isMongoDB) {
+            // MongoDB Raw Query
+            const [startDate, endDate] = this.getDateRange(date);
+            
+            const matchStage = {
+              $match: {
+                "data.programId": programId,
+                "data.startDate": {
+                  $gte: startDate.toISOString(),
+                  $lt: endDate.toISOString(),
+                }
+              }
+            };
+    
+            const result = await (this.prisma as any).$runCommandRaw({
+              aggregate: 'unsaved_visits',
+              pipeline: [
+                matchStage,
+                { $limit: 1000 } // Add a limit to prevent fetching too many records
+              ],
+              cursor: {}
+            });
+    
+            visits = result?.cursor?.firstBatch?.map(this.deserializeData) || [];
+    
+          } else {
+            // SQLite Raw Query
+            const startDate = `${date}T00:00:00.000Z`;
+            const endDate = `${date}T23:59:59.999Z`;
+    
+            const query = `
+              SELECT * FROM unsaved_visits
+              WHERE 
+                json_extract(data, '$.programId') = ? 
+                AND json_extract(data, '$.startDate') BETWEEN ? AND ?
+              ORDER BY "createdAt" DESC
+            `;
+            
+            visits = await (this.prisma as any).$queryRawUnsafe(
+              query,
+              programId,
+              startDate,
+              endDate
+            );
+          }
+          
+          return visits.map(visit => ({
+            ...this.deserializeData(visit.data)
+          }));
+    
+        } catch (error) {
+          this.logger.error(`Failed to fetch visits: ${error.message}`, error.stack);
+          return [];
+        }
+      }
 
     async getActiveVisits(programId: string, identifier: string): Promise<UnsavedVisit[]> {
       try {
@@ -110,6 +208,39 @@ export class UnsavedVisitsService {
         }
     }
 
+      async createBus(data: any): Promise<any | null> {
+        try {
+            // Generate a positive number that fits within a standard INT column
+            const min = 1; // Smallest positive integer
+            const max = 2147483647; // Maximum value for a signed 32-bit INT
+            const visit_id = Math.floor(Math.random() * (max - min + 1)) + min;
+            this.logger.log(`Generated new visit_id: ${visit_id}`);
+
+            data.id = JSON.stringify(visit_id); // Ensure the data has the visit_id
+            data.patientId = data.identifier; // Ensure the data has the patientId
+            const newVisitDto: any = {
+                visit_id,
+                data
+            };
+    
+            await this.deleteUnsavedVisitByIdentifier(data.identifier);
+    
+            const createdVisit = await this.create(newVisitDto);
+            
+            if (createdVisit) {
+                this.logger.log(`Successfully created visit with visit_id: ${createdVisit.visit_id}`);
+            } else {
+                this.logger.error(`Failed to create visit with generated visit_id: ${visit_id}`);
+            }
+    
+            return createdVisit.data;
+    
+        } catch (error) {
+            this.logger.error(`Failed to execute createBus: ${error.message}`, error.stack);
+            return null;
+        }
+      }
+
     async deleteUnsavedVisitByIdentifier(identifier: string): Promise<any> {
         try {
             this.logger.log(`Attempting to delete unsaved visit with data.identifier: ${identifier}`);
@@ -166,6 +297,36 @@ export class UnsavedVisitsService {
             return false;
         }
     }
+
+      async findAll(options?: VisitQueryOptions): Promise<any[]> {
+        try {
+          const queryOptions: Prisma.VisitFindManyArgs = {};
+    
+          if (options?.skip) {
+            queryOptions.skip = options.skip;
+          }
+    
+          if (options?.limit) {
+            queryOptions.take = options.limit;
+          }
+    
+          if (options?.sort) {
+            // Convert Mongoose sort format to Prisma orderBy
+            queryOptions.orderBy = this.convertSortToPrisma(options.sort);
+          }
+    
+          const unsavedVisits = await this.prisma.unsavedVisit.findMany(queryOptions as any);
+          
+          // Deserialize data for each visit
+          return unsavedVisits.map(unsavedVisit => ({
+            ...unsavedVisit,
+            data: this.deserializeData(unsavedVisit.data)
+          }));
+        } catch (error) {
+          this.logger.error(`Failed to fetch visits: ${error.message}`, error.stack);
+          return [];
+        }
+      }
 
     async delete(visitId: number): Promise<UnsavedVisit> {
         try {
