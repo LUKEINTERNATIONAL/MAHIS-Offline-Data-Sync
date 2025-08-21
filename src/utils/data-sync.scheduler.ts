@@ -2,7 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { DataSyncService } from './../app.dataSyncService';
-import { AuthService, fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges } from './../app.authService';
+import { fetchAndSaveUserData, syncPatientIds, makePatientSyncRequest, updatePayload, updateIfSitePatientCountChanges } from './../app.authService';
+import { AuthService } from "../modules/SharedModule/shared.module";
 import { HttpService } from '@nestjs/axios';
 import { PatientService } from '../modules/patient/patient.service';
 import { DDE4DataSyncService } from './../app.dde4dataSyncService';
@@ -11,6 +12,8 @@ import { VisitAndStagesSyncService } from './../app.VisitAndStagesSyncService';
 import { UserService } from '../modules/user/user.service';
 import { ServerPatientCountService } from '../modules/serverPatientCount/server-patient-count.service';
 import { ServerTimeService } from './../app.serverTimeService';
+import { UnsavedVisitsService } from '../modules/unsavedVisits/unsavedVisit.service';
+import { StageService } from '../modules/stage/stage.service';
 
 @Injectable()
 export class DataSyncScheduler implements OnModuleInit {
@@ -29,6 +32,8 @@ export class DataSyncScheduler implements OnModuleInit {
     private readonly userService: UserService,
     private readonly serverPatientCountService: ServerPatientCountService,
     private readonly serverTimeService: ServerTimeService,
+    private readonly unsavedVisitsService: UnsavedVisitsService,
+    private readonly stageService: StageService,
   ) {
     // Get configuration from environment variables with defaults
     this.isEnabled = this.configService.get<string>('SYNC_SCHEDULER_ENABLED') !== 'false';
@@ -92,6 +97,9 @@ async checkPatientCountChanges() {
         this.ddeService
       )
     );
+    await this.unsavedVisitsService.syncUnsavedVisits();
+    await this.unsavedVisitsService.syncPendingUpdateVisits();
+    await this.stageService.syncUnsavedStages();
     await this.visitAndStagesSyncService.getStagesViaExternalAPI();
     await this.visitAndStagesSyncService.getVisitsViaExternalAPI();
     await this.serverTimeService.getServerTimeAndDate();

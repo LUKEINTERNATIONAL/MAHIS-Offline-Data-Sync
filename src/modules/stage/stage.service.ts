@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { AuthService } from '../SharedModule/shared.module';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 
 export interface CreateStageDto {
   stage_id: number; // Changed from 'id' to match Prisma schema
@@ -21,8 +24,13 @@ export interface StageQueryOptions {
 @Injectable()
 export class StageService {
   private readonly logger = new Logger(StageService.name);
+  private readonly isMongoDB: boolean;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly authService: AuthService,
+    private readonly httpService: HttpService,
+  ) {}
 
   // Create a new stage or update if exists
   async create(createStageDto: CreateStageDto) {
@@ -51,6 +59,38 @@ export class StageService {
       return null;
     }
   }
+
+  async createBus(data: any): Promise<any | null> {
+    try {
+        // Generate a positive number that fits within a standard INT column
+        const min = 1; // Smallest positive integer
+        const max = 2147483647; // Maximum value for a signed 32-bit INT
+        const stage_id = Math.floor(Math.random() * (max - min + 1)) + min;
+
+        // 2. Create the DTO with the generated ID and provided data
+        data.id = JSON.stringify(stage_id)
+        const newStageDto: CreateStageDto = {
+            stage_id,
+            data
+        };
+
+        this.deleteByDataIdentifier(data.identifier); // Ensure no duplicates by identifier
+
+        // 3. Call the existing create method to save the new stage
+        const createdStage = await this.create(newStageDto);
+
+        if (createdStage) {
+            this.logger.log(`Successfully created stage with stage_id: ${createdStage.stage_id}`);
+        } else {
+            this.logger.error(`Failed to create stage with generated stage_id: ${stage_id}`);
+        }
+
+        return createdStage;
+    } catch (error) {
+        this.logger.error(`Failed to execute createBus: ${error.message}`, error.stack);
+        return null;
+    }
+}
 
   // Find all stages with optional query options
   async findAll(options?: StageQueryOptions) {
@@ -96,8 +136,7 @@ export class StageService {
       }
 
       return {
-        ...stage,
-        data: this.deserializeData(stage.data)
+        ...this.deserializeData(stage.data)
       };
     } catch (error) {
       this.logger.error(`Failed to find stage by ID ${id}: ${error.message}`, error.stack);
@@ -118,8 +157,7 @@ export class StageService {
       }
 
       return {
-        ...stage,
-        data: this.deserializeData(stage.data)
+        ...this.deserializeData(stage.data)
       };
     } catch (error) {
       this.logger.error(`Failed to find stage by stage_id ${stageId}: ${error.message}`, error.stack);
@@ -142,8 +180,7 @@ export class StageService {
         if (existingStage) {
           this.logger.warn(`Stage with stage_id ${updateStageDto.stage_id} already exists, skipping update`);
           return {
-            ...existingStage,
-            data: this.deserializeData(existingStage.data)
+            ...this.deserializeData(existingStage.data)
           };
         }
       }
@@ -162,8 +199,7 @@ export class StageService {
       });
 
       return {
-        ...updatedStage,
-        data: this.deserializeData(updatedStage.data)
+        ...this.deserializeData(updatedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -187,8 +223,7 @@ export class StageService {
         if (existingStage) {
           this.logger.warn(`Stage with stage_id ${updateStageDto.stage_id} already exists, skipping update`);
           return {
-            ...existingStage,
-            data: this.deserializeData(existingStage.data)
+            ...this.deserializeData(existingStage.data)
           };
         }
       }
@@ -207,8 +242,7 @@ export class StageService {
       });
 
       return {
-        ...updatedStage,
-        data: this.deserializeData(updatedStage.data)
+         ...this.deserializeData(updatedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -228,8 +262,7 @@ export class StageService {
       });
 
       return {
-        ...deletedStage,
-        data: this.deserializeData(deletedStage.data)
+        ...this.deserializeData(deletedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -249,8 +282,7 @@ export class StageService {
       });
 
       return {
-        ...deletedStage,
-        data: this.deserializeData(deletedStage.data)
+        ...this.deserializeData(deletedStage.data)
       };
     } catch (error) {
       if (error.code === 'P2025') { // Record not found
@@ -403,6 +435,55 @@ export class StageService {
     }
   }
 
+  async deleteByDataIdentifier(identifier: string) {
+    this.logger.log(`Attempting to delete stage with data.identifier: ${identifier}`);
+
+    try {
+      // Check the database provider to use the correct query
+      if (process.env.DATABASE_PROVIDER.toString() === 'mongodb') {
+        const query = { 'data.identifier': identifier };
+        const result = await (this.prisma as any).stage.deleteMany({
+          where: query,
+        });
+        
+        // deleteMany returns a count, so we need to fetch the deleted data if needed
+        if (result.count > 0) {
+            this.logger.log(`Successfully deleted ${result.count} stage(s) with data.identifier: ${identifier}`);
+            // Note: Prisma's deleteMany doesn't return the deleted records.
+            // You might want to return the count or a success message.
+            return { deletedCount: result.count };
+        }
+
+      } else if (process.env.DATABASE_PROVIDER.toString() === 'sqlite') {
+        const query = Prisma.sql`
+          DELETE FROM "stages"
+          WHERE json_extract(data, '$.identifier') = ${identifier}
+          RETURNING *;
+        `;
+        const result = await (this.prisma as any).$queryRaw(query);
+
+        if (result && result.length > 0) {
+            this.logger.log(`Successfully deleted ${result.length} stage(s) with data.identifier: ${identifier}`);
+            // Return the first deleted item as an example
+            const stage = result[0];
+            return {
+                ...this.deserializeData(stage.data)
+            };
+        }
+      } else {
+        // Fallback for an unknown database provider
+        this.logger.warn('Unknown DATABASE_PROVIDER. Deletion by data.identifier not supported.');
+        return null;
+      }
+
+      this.logger.warn(`No stage found with data.identifier: ${identifier} for deletion`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to delete stage with data.identifier ${identifier}: ${error.message}`, error.stack);
+      return null;
+    }
+  }
+
   async deleteMany(stageIds: number[]): Promise<{ deletedCount: number }> {
     try {
       const result = await this.prisma.stage.deleteMany({
@@ -462,4 +543,170 @@ export class StageService {
     
     return { stage_id: 'asc' }; // Default sort
   }
+
+  async deleteStageByIdentifier(identifier: string): Promise<any> {
+    try {
+      this.logger.log(`Attempting to delete stage with data.identifier: ${identifier}`);
+
+      if (!identifier) {
+        throw new BadRequestException('Identifier is required.');
+      }
+
+      let deletionResult: any;
+
+      if (this.isMongoDB) {
+        // MongoDB Raw Query for deletion
+        // Using a simple deleteOne or deleteMany
+        const result = await (this.prisma as any).$runCommandRaw({
+          delete: "stages",
+          deletes: [
+            {
+              q: {
+                "data.identifier": identifier
+              },
+              limit: 1 // To delete only one record
+            }
+          ],
+          ordered: true
+        });
+        deletionResult = result.n; // number of deleted documents
+
+      } else {
+        // SQLite Raw Query for deletion
+        const query = `
+          DELETE FROM stages
+          WHERE 
+          json_extract(data, '$.identifier') = ?
+        `;
+        
+        const results = await (this.prisma as any).$executeRawUnsafe(
+          query,
+          identifier
+        );
+        
+        deletionResult = results; // number of deleted rows
+      }
+
+      if (deletionResult === 0) {
+        this.logger.warn(`Stage with identifier ${identifier} not found. No records deleted.`);
+      } else {
+        this.logger.log(`Successfully deleted ${deletionResult} record(s) with identifier ${identifier}.`);
+      }
+
+      return deletionResult > 0; // Return true if at least one record was deleted
+
+    } catch (error) {
+      this.logger.error(`Failed to delete stage by identifier ${identifier}: ${error.message}`, error.stack);
+      return false;
+    }
+  }
+
+      async syncUnsavedStages(): Promise<void> {
+        this.logger.log('Starting synchronization of unsaved stages with sync_status: pending');
+
+        try {
+            let pendingStages: any[];
+
+            if (this.isMongoDB) {
+                // MongoDB Raw Query for filtering by a nested field
+                const matchStage = {
+                    $match: {
+                        "data.sync_status": "pending"
+                    }
+                };
+                const result = await (this.prisma as any).$runCommandRaw({
+                    aggregate: 'stages',
+                    pipeline: [matchStage],
+                    cursor: {}
+                });
+
+                pendingStages = result?.cursor?.firstBatch?.map(stage => ({
+                    ...stage,
+                    data: this.deserializeData(stage.data)
+                })) || [];
+
+            } else {
+                // SQLite Raw Query for filtering by a nested field
+                const query = `
+                    SELECT * FROM stages
+                    WHERE json_extract(data, '$.sync_status') = 'pending'
+                `;
+                pendingStages = await (this.prisma as any).$queryRawUnsafe(query);
+
+                pendingStages = pendingStages.map(stage => ({
+                    ...stage,
+                    data: this.deserializeData(stage.data)
+                }));
+            }
+
+            if (pendingStages.length === 0) {
+                this.logger.log('No pending unsaved stages found to sync.');
+                return;
+            }
+
+            this.logger.log(`Found ${pendingStages.length} stages with a pending sync status. Syncing each...`);
+
+            // Use Promise.all to concurrently process each pending stage
+            const syncPromises = pendingStages.map(async (stage) => {
+                try {
+                    // Call the external API for each pending stage
+                    const apiResponse = await this.saveUnsavedStageViaExternalAPI(stage.data);
+                    
+                    if (apiResponse && apiResponse.success) {
+                        this.logger.log(`Successfully synced stage ID: ${stage.id}`);
+                        // Optionally, you could update the sync_status to 'synced' here
+                        // e.g., await this.updateById(stage.id, { data: { ...stage.data, sync_status: 'synced' } });
+                    } else {
+                        this.logger.warn(`Failed to sync stage ID: ${stage.id}. API response was not successful.`);
+                    }
+                } catch (apiError) {
+                    this.logger.error(`Error during sync for stage ID: ${stage.id}: ${apiError}`);
+                }
+            });
+
+            // Wait for all sync operations to complete
+            await Promise.all(syncPromises);
+
+            this.logger.log('Completed synchronization of all pending stages.');
+
+        } catch (error) {
+            this.logger.error(`Error during stage synchronization: ${error.message}`, error);
+        }
+    }
+
+        async saveUnsavedStageViaExternalAPI(data: any): Promise<any> {
+    
+            const isAuthenticated = await this.authService.ensureAuthenticated();
+            if (!isAuthenticated) {
+                this.logger.error("Failed to authenticate")
+            }
+    
+            if (!data) {
+                throw new Error('Sync payload is required');
+            }
+
+            delete data.id;
+    
+            const saveUrl = `${this.authService.getBaseUrl()}/stages`;
+    
+            const { data: responseData } = await lastValueFrom(
+                this.httpService.post(saveUrl, data, {
+                    headers: {
+                    Authorization: this.authService.getAuthToken(),
+                    'Content-Type': 'application/json',
+                    },
+                    timeout: 30000, // 30 second timeout
+                })
+            );
+    
+            if (responseData) {
+                console.log(JSON.stringify(responseData));
+                // await this.deleteUnsavedVisitByIdentifier(responseData.visit.identifier);
+                // await this.visitService.create({"visit_id": responseData.visit.id, "data": responseData.visit});
+    
+            return { success: true, responseData };
+            }
+    
+            return { success: false, error: 'No response data received' };
+        }
 }

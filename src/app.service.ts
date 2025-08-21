@@ -17,7 +17,7 @@ export class AppService {
 
   async getHome(): Promise<string> {
     const port = process.env.PORT || 3009;
-    const apiUrl = `http://${process.env.HOST || '192.168.0.105'}:${port}/receive-payload`;
+    const apiUrl = `https://${process.env.HOST || '192.168.0.105'}:${port}/receive-payload`;
     const qrCodeDataUrl = await generateQRCodeDataURL(apiUrl);
     return getAPIHomePage(port, apiUrl, qrCodeDataUrl);
   }
@@ -229,7 +229,7 @@ export class AppService {
   }
 
   async getPatientPayload(patientId: string) {
-    const patient = await this.patientService.findByPatientId(patientId);
+    const patient = await this.patientService.findPatientByIdentifier(patientId);
     if (!patient) {
       throw new NotFoundException(`Patient with ID ${patientId} not found`);
     }

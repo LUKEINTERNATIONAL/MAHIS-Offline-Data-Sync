@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { AuthService } from './app.authService';
+import { AuthService } from "./modules/SharedModule/shared.module";
 import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { lastValueFrom } from "rxjs";
@@ -34,7 +34,7 @@ export class VisitAndStagesSyncService {
 
             this.Visitlogger.log(`Syncing visits`);
 
-            const GET_VISITS_URL = `${this.authService.getBaseUrl()}/visits/by_location`;
+            const GET_VISITS_URL = `${this.authService.getBaseUrl()}/visits`;
 
             const { data: responseData } = await lastValueFrom(
                 this.httpService.get(GET_VISITS_URL, {
@@ -51,8 +51,8 @@ export class VisitAndStagesSyncService {
 
             if (responseData) {
                 function transformVisitData(flatVisits: any[]): any[] {
-                    return flatVisits.map(stage => {
-                        const { id, ...data } = stage;
+                    return flatVisits.map(visit => {
+                        const { id, ...data } = visit;
                         return {
                             visit_id: id, // Use visit_id for VisitService
                             data: {
@@ -63,7 +63,7 @@ export class VisitAndStagesSyncService {
                     });
                 }
 
-                const transformedVisits = transformVisitData(responseData.visits);
+                const transformedVisits = transformVisitData(responseData);
                 await this.visitService.createMany(transformedVisits);
             }
         } catch (error) {
@@ -80,7 +80,7 @@ export class VisitAndStagesSyncService {
 
             this.Stagelogger.log(`Syncing stages`);
 
-            const GET_STAGES_URL = `${this.authService.getBaseUrl()}/stages/active_stages`;
+            const GET_STAGES_URL = `${this.authService.getBaseUrl()}/stages`;
 
             const { data: responseData } = await lastValueFrom(
                 this.httpService.get(GET_STAGES_URL, {

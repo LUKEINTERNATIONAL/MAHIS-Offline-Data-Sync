@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Visit, Prisma } from '@prisma/client';
+import { ServerTimeService } from '../SharedModule/shared.module';
 
 export interface CreateVisitDto {
   visit_id: number;
@@ -21,10 +22,142 @@ export interface VisitQueryOptions {
 @Injectable()
 export class VisitService {
   private readonly logger = new Logger(VisitService.name);
+  private readonly isMongoDB: boolean;
   
   constructor(
-    private readonly prisma: PrismaService
-  ) {}
+    private readonly prisma: PrismaService,
+    private readonly serverTimeService: ServerTimeService,
+  ) {
+    this.isMongoDB = process.env.DATABASE_PROVIDER === 'mongodb';
+  }
+
+async getTodaysVisits(programId: string, date: string): Promise<Visit[]> {
+    try {
+      this.logger.log(`Fetching visits for programId: ${programId} on date: ${date}`);
+
+      if (!programId || !date) {
+        throw new BadRequestException('Program ID and date are required.');
+      }
+      
+      let visits: Visit[] = [];
+
+      if (this.isMongoDB) {
+        // MongoDB Raw Query
+        const [startDate, endDate] = this.getDateRange(date);
+        
+        const matchStage = {
+          $match: {
+            "data.programId": programId,
+            "data.startDate": {
+              $gte: startDate.toISOString(),
+              $lt: endDate.toISOString(),
+            }
+          }
+        };
+
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'visit',
+          pipeline: [
+            matchStage,
+            { $limit: 1000 } // Add a limit to prevent fetching too many records
+          ],
+          cursor: {}
+        });
+
+        visits = result?.cursor?.firstBatch?.map(this.deserializeData) || [];
+
+      } else {
+        // SQLite Raw Query
+        const startDate = `${date}T00:00:00.000Z`;
+        const endDate = `${date}T23:59:59.999Z`;
+
+        const query = `
+          SELECT * FROM visits
+          WHERE 
+            json_extract(data, '$.programId') = ? 
+            AND json_extract(data, '$.startDate') BETWEEN ? AND ?
+          ORDER BY "createdAt" DESC
+        `;
+        
+        visits = await (this.prisma as any).$queryRawUnsafe(
+          query,
+          programId,
+          startDate,
+          endDate
+        );
+      }
+      
+      return visits.map(visit => ({
+        ...this.deserializeData(visit.data)
+      }));
+
+    } catch (error) {
+      this.logger.error(`Failed to fetch visits: ${error.message}`, error.stack);
+      return [];
+    }
+  }
+
+async getActiveVisits(programId: any, identifier: any): Promise<Visit[]> {
+  try {
+    this.logger.log(`Fetching visits for programId: ${programId} and patientId: ${identifier}`);
+
+    if (!programId || !identifier) {
+      throw new BadRequestException('Program ID and Patient ID are required.');
+    }
+    
+    let visits: Visit[] = [];
+
+    if (this.isMongoDB) {
+      // MongoDB Raw Query
+      const matchStage = {
+        $match: {
+          "data.programId": programId,
+          "data.identifier": identifier,
+        }
+      };
+
+      const result = await (this.prisma as any).$runCommandRaw({
+        aggregate: 'visit',
+        pipeline: [
+          matchStage,
+          { $limit: 1000 }
+        ],
+        cursor: {}
+      });
+
+      visits = result?.cursor?.firstBatch?.map(visit => ({
+         ...this.deserializeData(visit.data)
+      })) || [];
+
+    } else {
+      // SQLite Raw Query
+      const query = `
+        SELECT * FROM visits
+        WHERE 
+          json_extract(data, '$.programId') = ? 
+          AND json_extract(data, '$.identifier') = ?
+        ORDER BY "createdAt" DESC
+      `;
+      
+      visits = await (this.prisma as any).$queryRawUnsafe(
+        query,
+        programId,
+        identifier
+      );
+
+      // Deserialize data for each visit
+      visits = visits.map(visit => ({
+        ...this.deserializeData(visit.data)
+      }));
+    }
+    
+    return visits;
+
+  } catch (error) {
+    this.logger.error(`Failed to fetch visits for patient: ${identifier}: ${error.message}`, error.stack);
+    return [];
+  }
+}
 
   // Create or update if exists
   async create(createVisitDto: CreateVisitDto): Promise<Visit> {
@@ -123,8 +256,7 @@ export class VisitService {
       }
       
       return {
-        ...visit,
-        data: this.deserializeData(visit.data)
+         ...this.deserializeData(visit.data)
       };
     } catch (error) {
       this.logger.error(`Failed to find visit by visit_id ${visitId}: ${error.message}`, error.stack);
@@ -421,6 +553,84 @@ export class VisitService {
     }
   }
 
+  async getVisitById(id: string): Promise<Visit | null> {
+    try {
+      this.logger.log(`Fetching visit with data.id: ${id}`);
+  
+      if (!id) {
+        throw new BadRequestException('ID is required.');
+      }
+      
+      let visit: Visit | null = null;
+  
+      if (this.isMongoDB) {
+        // MongoDB Raw Query
+        const matchStage = {
+          $match: {
+            "data.id": id,
+          }
+        };
+
+        const result = await (this.prisma as any).$runCommandRaw({
+          aggregate: 'visits',
+          pipeline: [
+            matchStage,
+            { $limit: 1 }
+          ],
+          cursor: {}
+        });
+
+        const firstBatch = result?.cursor?.firstBatch;
+        if (firstBatch && firstBatch.length > 0) {
+          const doc = firstBatch[0];
+          visit = {
+            ...doc,
+            data: this.deserializeData(doc.data)
+          };
+        }
+      } else {
+        // SQLite Raw Query
+        const query = `
+          SELECT * FROM visits
+          WHERE 
+          json_extract(data, '$.id') = ?
+          LIMIT 1
+        `;
+        
+        const results = await (this.prisma as any).$queryRawUnsafe(
+          query,
+          id
+        );
+
+        if (results.length > 0) {
+          visit = {
+            ...results[0],
+            data: this.deserializeData(results[0].data)
+          };
+        }
+      }
+      
+      if (!visit) {
+        this.logger.warn(`Visit with id ${id} not found.`);
+      }
+
+      return visit;
+    
+    } catch (error) {
+      this.logger.error(`Failed to fetch visit by id ${id}: ${error.message}`, error.stack);
+      return null;
+    }
+  }
+
+  // Helper method to create date range
+  private getDateRange(dateString: string): [Date, Date] {
+    const startDate = new Date(dateString);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(dateString);
+    endDate.setHours(23, 59, 59, 999);
+    return [startDate, endDate];
+  }
+
   // Helper methods for data serialization/deserialization
   private serializeData(data: any): any {
     if (data === null || data === undefined) return null;
@@ -467,5 +677,62 @@ export class VisitService {
     }
     
     return { visit_id: 'asc' }; // Default sort
+  }
+
+  async deleteVisitByIdentifier(identifier: string): Promise<any> {
+    try {
+        this.logger.log(`Attempting to delete uvisit with data.identifier: ${identifier}`);
+
+        if (!identifier) {
+            throw new BadRequestException('Identifier is required.');
+        }
+
+        let deletionResult: any;
+
+        if (this.isMongoDB) {
+            // MongoDB Raw Query for deletion
+            // Using a simple deleteOne or deleteMany
+            const result = await (this.prisma as any).$runCommandRaw({
+                delete: "visits",
+                deletes: [
+                    {
+                        q: {
+                            "data.identifier": identifier
+                        },
+                        limit: 1 // To delete only one record
+                    }
+                ],
+                ordered: true
+            });
+            deletionResult = result.n; // number of deleted documents
+
+        } else {
+            // SQLite Raw Query for deletion
+            const query = `
+                DELETE FROM visits
+                WHERE 
+                json_extract(data, '$.identifier') = ?
+            `;
+            
+            const results = await (this.prisma as any).$executeRawUnsafe(
+                query,
+                identifier
+            );
+            
+            deletionResult = results; // number of deleted rows
+        }
+
+        if (deletionResult === 0) {
+            this.logger.warn(`visit with identifier ${identifier} not found. No records deleted.`);
+        } else {
+            this.logger.log(`Successfully deleted ${deletionResult} record(s) with identifier ${identifier}.`);
+        }
+
+        return deletionResult > 0; // Return true if at least one record was deleted
+
+    } catch (error) {
+        this.logger.error(`Failed to delete visit by identifier ${identifier}: ${error.message}`, error.stack);
+        return false;
+    }
   }
 }

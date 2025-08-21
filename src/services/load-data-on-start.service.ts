@@ -16,7 +16,7 @@ import { SpecimenService } from "../modules/specimen/specimen.service";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { lastValueFrom } from "rxjs";
-import { AuthService } from "../app.authService";
+import { AuthService } from "../modules/SharedModule/shared.module";
 @Injectable()
 export class LoadDataOnStartService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);

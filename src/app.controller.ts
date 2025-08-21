@@ -1,5 +1,5 @@
 // app.controller.ts
-import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, Param, NotFoundException, BadRequestException, Query, Logger, Delete } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PatientService } from './modules/patient/patient.service';
 import { DDEService } from './modules/dde/ddde.service';
@@ -7,6 +7,7 @@ import { VisitService } from './modules/visit/visit.service';
 import { StageService } from './modules/stage/stage.service';
 import { ServerTimeService } from './app.serverTimeService';
 import { LiveAPIService } from './app.liveAPIService';
+import { CreateUnsavedVisitDto, UnsavedVisitsService } from './modules/unsavedVisits/unsavedVisit.service';
 
 // Define a DTO (Data Transfer Object) for the payload
 export class PayloadDto {
@@ -19,6 +20,7 @@ export class PayloadDto {
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
   constructor(
     private readonly appService: AppService,
     private readonly patientService: PatientService,
@@ -27,6 +29,7 @@ export class AppController {
     private readonly stageService: StageService,
     private readonly serverTimeService: ServerTimeService,
     private readonly liveAPIService: LiveAPIService,
+    private readonly unsavedVisitsService: UnsavedVisitsService,
   ) {}
 
   @Get()
@@ -89,14 +92,162 @@ async getPatientPayload(@Param('patientId') patientId: string) {
 
   @Get('visits')
   async getVisits() {
-    const visits = await this.visitService.findAll();
-    return visits.map(visit => visit.data);
+      const visits = await this.visitService.findAll();
+      const unsavedVisits = await this.unsavedVisitsService.findAll();
+      
+      this.logger.log(`Fetched ${visits.length} visits and ${unsavedVisits.length} unsaved visits`);
+
+      // Use the spread operator to combine the arrays
+      const mergedVisits = [...visits, ...unsavedVisits];
+
+      // Map over the merged array to return the 'data' property
+      return mergedVisits.map(visit => visit.data);
   }
 
   @Get('stages')
   async getStages() {
     const stages = await this.stageService.findAll();
     return stages.map(stage => stage.data);
+  }
+
+  @Post('stages/create')
+  async createStage(@Body() stageData: any) {
+    this.logger.log('Creating new stage with data:', stageData);
+    try {
+      const createdStage = await this.stageService.createBus(stageData);
+      return createdStage;
+    } catch (error) {
+      this.logger.error(`Error creating stage: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create stage');
+    }
+  }
+
+  @Post('visits/create')
+  async createVisit(@Body() visitData: any) {
+    this.logger.log('Creating new visit with data:', visitData);
+    try {
+      const createdVisit = await this.unsavedVisitsService.createBus(visitData);
+      return createdVisit;
+    } catch (error) {
+      this.logger.error(`Error creating visit: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to create visit');
+    }
+  }
+
+  @Get('todays-visits')
+  async getTodaysVisits(
+    @Query('programId') programId: string,
+    @Query('date') date?: string, // Make the date parameter optional
+  ) {
+    if (!programId) {
+      throw new BadRequestException('programId query parameter is required.');
+    }
+
+    let queryDate: string;
+
+    // Check if a date was provided in the query
+    if (date) {
+      // Use the provided date
+      queryDate = date;
+      this.logger.log(`Using provided date: ${queryDate}`);
+    } else {
+      // Fall back to the current server date
+      const serverTimeData = this.serverTimeService.getStoredServerTimeData();
+      if (!serverTimeData || !serverTimeData.date) {
+        throw new BadRequestException('Server date is not available.');
+      }
+      queryDate = serverTimeData.date;
+      this.logger.log(`Using server's local date: ${queryDate}`);
+    }
+
+    try {
+      const visits = await this.visitService.getTodaysVisits(programId, queryDate);
+      const unsavedVisits = await this.unsavedVisitsService.getTodaysVisits(programId, queryDate);
+      this.logger.log(`Fetched ${visits.length} visits and ${unsavedVisits.length} unsaved visits for programId: ${programId} on date: ${queryDate}`);
+      return [...visits, ...unsavedVisits];
+    } catch (error) {
+      this.logger.error(`Failed to fetch visits for programId: ${programId} on date: ${queryDate}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Get('visits/active')
+  async getActiveVisits(
+    @Query('programId') programId: any,
+    @Query('patientId') patientId: any,
+  ) {
+    if (!programId || !patientId) {
+      throw new BadRequestException('Both programId and patientId query parameters are required.');
+    }
+
+    this.logger.log(`Fetching active visits for program: ${programId} and patient: ${patientId}`);
+    
+    const visits = await this.visitService.getActiveVisits(programId, patientId);
+    return visits;
+  }
+
+  @Get('visits/by-data-id')
+  async getVisitByDataId(
+    @Query('id') id: string,
+  ): Promise<any> {
+    if (!id) {
+      throw new BadRequestException('The "id" query parameter is required.');
+    }
+
+    this.logger.log(`Fetching visit by data.id: ${id}`);
+    
+    const visit = await this.visitService.getVisitById(id);
+    return visit;
+  }
+
+  @Get('unsaved-visits/by-identifier')
+  async getUnsavedVisitByIdentifier(
+    @Query('identifier') identifier: string,
+  ): Promise<any> {
+    if (!identifier) {
+      throw new BadRequestException('The "identifier" query parameter is required.');
+    }
+
+    this.logger.log(`Fetching unsaved visit for identifier: ${identifier}`);
+    
+    const unsavedVisit = await this.unsavedVisitsService.getUnsavedVisitByIdentifier(identifier);
+    return unsavedVisit;
+  }
+
+  @Post('unsaved-visits/create')
+  async createUnsavedVisit(@Body() createUnsavedVisitDto: CreateUnsavedVisitDto) {
+    this.logger.log('Creating new unsaved visit');
+
+    try {
+      const createdVisit = await this.unsavedVisitsService.create(createUnsavedVisitDto);
+      return createdVisit;
+    } catch (error) {
+      this.logger.error(`Error creating unsaved visit: ${error.message}`, error.stack);
+    }
+  }
+
+  @Delete('stages/deleteByStageId') // No :stageId in the path
+  async deleteStageById(@Query('stageId') stageId: number) {
+    if (!stageId) {
+      throw new BadRequestException('The "stageId" query parameter is required.');
+    }
+    this.logger.log(`Deleting stage with ID: ${stageId}`);
+    const deletedStage = await this.stageService.deleteByStageId(stageId);
+    return deletedStage; // Return the deleted stage or a success message
+  }
+
+  @Delete('stages/deleteByIdentifier/:identifier')
+  async deleteByIdentifier(@Param('identifier') identifier: string) {
+    if (!identifier) {
+      throw new BadRequestException('The "identifier" path parameter is required.');
+    }
+    
+    this.logger.log(`Deleting stage with identifier: ${identifier}`);
+    
+    // Call the new service method that handles nested data deletion
+    const deletedStage = await this.stageService.deleteByDataIdentifier(identifier);
+    
+    return deletedStage;
   }
 
   @Get('search')

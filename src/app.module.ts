@@ -7,7 +7,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { DataSyncService } from "./app.dataSyncService";
 import { DataSyncScheduler } from "./utils/data-sync.scheduler";
-import { AuthService } from "./app.authService";
+import { AuthService } from "./modules/SharedModule/shared.module";
 import { SyncGateway } from "./websocket/gateways/sync.gateway";
 import { ConceptNameModule } from "./modules/conceptName/concept-name.module";
 import { WardModule } from "./modules/wards/ward.module";
@@ -39,6 +39,8 @@ import { StageService } from "./modules/stage/stage.service";
 import { VisitAndStagesSyncService } from "./app.VisitAndStagesSyncService";
 import { PrismaModule } from "./modules/prisma/prisma.module";
 import { LiveAPIService } from "./app.liveAPIService";
+import { SharedModule } from "./modules/SharedModule/shared.module";
+import { unsavedVisitModule } from "./modules/unsavedVisits/visit.module";
 
 @Module({
   imports: [
@@ -78,6 +80,8 @@ import { LiveAPIService } from "./app.liveAPIService";
     ServerPatientCountModule,
     VisitModule,
     StageModule,
+    SharedModule,
+    unsavedVisitModule,
   ],
   controllers: [AppController],
   providers: [
@@ -94,6 +98,6 @@ import { LiveAPIService } from "./app.liveAPIService";
     ServerTimeService,
     LiveAPIService,
   ],
-  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService, LiveAPIService],
+  exports: [AuthService, DataSyncService, DDE4DataSyncService, ServerTimeService, VisitService, LiveAPIService],
 })
 export class AppModule {}
